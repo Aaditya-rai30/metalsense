@@ -1,0 +1,31 @@
+Country,Authority,Standard,Context,Symbol,Metal,PermissibleLimit,Unit,ReferenceType
+India,BIS,BIS IS 10500:2012,Drinking Water,Pb,Lead,0.01,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,Cd,Cadmium,0.003,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,As,Arsenic,0.05,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,Cr,Chromium,0.05,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,Cu,Copper,1.5,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,Zn,Zinc,15.0,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,Ni,Nickel,0.02,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,Fe,Iron,0.3,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,Mn,Manganese,0.3,mg/L,National Standard
+India,BIS,BIS IS 10500:2012,Drinking Water,Hg,Mercury,0.001,mg/L,National Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Pb,Lead,0.1,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Cd,Cadmium,2.0,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,As,Arsenic,0.2,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Cr,Chromium,2.0,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Cu,Copper,3.0,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Zn,Zinc,5.0,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Ni,Nickel,3.0,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Fe,Iron,3.0,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Mn,Manganese,2.0,mg/L,Environmental Standard
+India,CPCB,CPCB General Environmental Standards,Environmental Effluent,Hg,Mercury,0.01,mg/L,Environmental Standard
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Pb,Lead,0.01,mg/L,Guideline Value
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Cd,Cadmium,0.003,mg/L,Guideline Value
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,As,Arsenic,0.01,mg/L,Guideline Value
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Cr,Chromium,0.05,mg/L,Guideline Value
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Cu,Copper,2.0,mg/L,Guideline Value
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Zn,Zinc,3.0,mg/L,Guideline Value
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Ni,Nickel,0.07,mg/L,Guideline Value
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Fe,Iron,,,Guideline Not Proposed
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Mn,Manganese,0.08,mg/L,Provisional Guideline Value
+WHO Default,WHO,WHO Guidelines for Drinking-water Quality,Drinking Water,Hg,Mercury,0.006,mg/L,Guideline Value

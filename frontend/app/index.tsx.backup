@@ -1,0 +1,2439 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const C = {
+  bg: "#EEFDF8",
+  surface: "#FFFFFF",
+  sidebar: "#FBFDFC",
+  green: "#249E73",
+  greenDark: "#188E68",
+  teal: "#0C92A3",
+  cyan: "#73D3DA",
+  mint: "#DDF7F1",
+  mint2: "#E8FAF6",
+  border: "#D4ECE5",
+  text: "#405168",
+  muted: "#9AA8AA",
+  muted2: "#B1BDBE",
+  danger: "#C94D4D",
+  warning: "#D6A329",
+  high: "#DE7A32",
+  shadow: "#23443A",
+};
+
+const backend =
+Constants.expoConfig?.extra?.backendUrl ||
+process.env.EXPO_PUBLIC_BACKEND_URL ||
+process.env.EXPO_BACKEND_URL ||
+"http://localhost:8000";
+
+  const API = `${backend.replace(/\/$/, "")}/api`;
+
+  type User = {
+    user_id?: string;
+    full_name: string;
+    email: string;
+    account_type: string;
+    organization?: string;
+    role: string;
+    institution?: string;
+    research_area?: string;
+    created_at: string;
+  };
+
+  type Dataset = {
+    dataset_id: string;
+    filename: string;
+    file_type: string;
+    imported_at: string;
+    columns: string[];
+    records: Record<string, any>[];
+    quality: {
+      score?: number;
+      total_records?: number;
+      valid_records?: number;
+      missing_values?: number;
+      coordinate_issues?: number;
+      [key: string]: any;
+    };
+  };
+
+  type Page =
+  | "dashboard"
+  | "import"
+  | "quality"
+  | "analysis"
+  | "spatial"
+  | "reports"
+  | "profile";
+
+  const NAV: { id: Page; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+    { id: "dashboard", label: "Dashboard", icon: "grid-outline" },
+{ id: "import", label: "Data Import", icon: "cloud-upload-outline" },
+{ id: "quality", label: "Data Quality", icon: "shield-checkmark-outline" },
+{ id: "analysis", label: "Pollution Analysis", icon: "analytics-outline" },
+{ id: "spatial", label: "Spatial & Temporal", icon: "map-outline" },
+{ id: "reports", label: "Reports & Decisions", icon: "document-text-outline" },
+{ id: "profile", label: "Profile", icon: "person-outline" },
+  ];
+
+  async function api(path: string, options: RequestInit = {}, token?: string) {
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string> | undefined),
+    };
+
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const response = await fetch(`${API}${path}`, { ...options, headers });
+    const body = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const message =
+      typeof body?.detail === "string"
+      ? body.detail
+      : body?.detail?.message || body?.message || "Something went wrong";
+      throw new Error(message);
+    }
+
+    return body;
+  }
+
+  function initials(name = "") {
+    return name.trim().charAt(0).toUpperCase() || "U";
+  }
+
+  function prettyDate(value?: string) {
+    if (!value) return "Not provided";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return value;
+    return d.toLocaleDateString();
+  }
+
+  function firstNumber(row: Record<string, any>, names: string[]) {
+    for (const name of names) {
+      const key = Object.keys(row).find(
+        (k) => k.toLowerCase().replace(/[^a-z0-9]/g, "") === name.toLowerCase().replace(/[^a-z0-9]/g, ""),
+      );
+      if (key != null && row[key] !== "" && row[key] != null) {
+        const n = Number(row[key]);
+        if (Number.isFinite(n)) return n;
+      }
+    }
+    return 0;
+  }
+
+  function hpiFor(row: Record<string, any>) {
+    const metals = ["Pb", "Cd", "As", "Cr", "Hg", "Ni", "Cu", "Zn", "Fe", "Mn"];
+    let sum = 0;
+    let count = 0;
+
+    for (const metal of metals) {
+      const value = firstNumber(row, [metal, metal.toLowerCase()]);
+      if (value > 0) {
+        sum += value;
+        count++;
+      }
+    }
+
+    if (count === 0) return 0;
+    return Math.min(100, sum * 7.5 + count * 1.2);
+  }
+
+  function statusFor(hpi: number) {
+    if (hpi >= 50) return "HIGH";
+    if (hpi >= 25) return "MODERATE";
+    return "LOW";
+  }
+
+  function statusColor(status: string) {
+    return status === "HIGH" ? C.high : status === "MODERATE" ? C.warning : C.green;
+  }
+
+  function sampleMetrics(dataset?: Dataset) {
+    if (!dataset) return [];
+    return (dataset.records || []).map((row, index) => {
+      const hpi =
+      Number(row.HPI ?? row.hpi ?? row.hpi_score) ||
+      hpiFor(row);
+
+      const hei =
+      Number(row.HEI ?? row.hei ?? row.hei_score) ||
+      hpi * 0.1;
+
+      const cd =
+      firstNumber(row, ["Cd", "cadmium"]) || 0;
+
+      const lat = firstNumber(row, ["latitude", "lat"]);
+      const lon = firstNumber(row, ["longitude", "lon", "lng"]);
+
+      return {
+        row,
+        id:
+        row.sample_id ||
+        row.sample ||
+        row.id ||
+        `S${String(index + 1).padStart(3, "0")}`,
+                                       hpi,
+                                       hei,
+                                       cd,
+                                       lat,
+                                       lon,
+                                       status: statusFor(hpi),
+      };
+    });
+  }
+
+  export default function Index() {
+    const [token, setToken] = useState<string | null>(null);
+    const [user, setUser] = useState<User | null>(null);
+    const [datasets, setDatasets] = useState<Dataset[]>([]);
+    const [page, setPage] = useState<Page>("dashboard");
+    const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+      let mounted = true;
+
+      AsyncStorage.multiGet(["ms_token", "ms_user"])
+      .then(([t, u]) => {
+        if (!mounted) return;
+
+        const savedToken = t?.[1];
+        const savedUser = u?.[1];
+
+        if (savedToken && savedUser && savedUser !== "undefined" && savedUser !== "null") {
+          try {
+            setToken(savedToken);
+            setUser(JSON.parse(savedUser));
+          } catch {
+            AsyncStorage.multiRemove(["ms_token", "ms_user"]);
+          }
+        }
+
+        setLoading(false);
+      })
+      .catch(() => mounted && setLoading(false));
+
+      return () => {
+        mounted = false;
+      };
+    }, []);
+
+    const refresh = async (t = token) => {
+      if (!t) return;
+
+      try {
+        const data = await api("/datasets", {}, t);
+        setDatasets(Array.isArray(data) ? data : data?.datasets || []);
+      } catch {
+        await signOut();
+      }
+    };
+
+    useEffect(() => {
+      if (token) refresh(token);
+    }, [token]);
+
+      const signIn = async (result: any) => {
+        if (!result?.token || !result?.user) {
+          throw new Error("The server returned an invalid login response.");
+        }
+
+        setToken(result.token);
+        setUser(result.user);
+        setPage("dashboard");
+
+        await AsyncStorage.multiSet([
+          ["ms_token", result.token],
+          ["ms_user", JSON.stringify(result.user)],
+        ]);
+      };
+
+      const signOut = async () => {
+        setToken(null);
+        setUser(null);
+        setDatasets([]);
+        setPage("dashboard");
+        await AsyncStorage.multiRemove(["ms_token", "ms_user"]);
+      };
+
+      if (loading) {
+        return (
+          <View style={styles.center}>
+          <ActivityIndicator color={C.green} size="large" />
+          </View>
+        );
+      }
+
+      if (!token || !user) {
+        return (
+          <Auth
+          mode={authMode}
+          setMode={setAuthMode}
+          onSuccess={signIn}
+          />
+        );
+      }
+
+      const activeDataset = datasets[0];
+
+      return (
+        <AppShell
+        page={page}
+        setPage={setPage}
+        user={user}
+        datasets={datasets}
+        activeDataset={activeDataset}
+        token={token}
+        refresh={refresh}
+        signOut={signOut}
+        />
+      );
+  }
+
+  function Auth({
+    mode,
+    setMode,
+    onSuccess,
+  }: {
+    mode: "login" | "signup";
+    setMode: (v: "login" | "signup") => void;
+    onSuccess: (v: any) => Promise<void>;
+  }) {
+    const [form, setForm] = useState<Record<string, string>>({});
+    const [busy, setBusy] = useState(false);
+    const [show, setShow] = useState(false);
+    const [error, setError] = useState("");
+
+    const update = (key: string, value: string) =>
+    setForm((old) => ({ ...old, [key]: value }));
+
+    const submit = async () => {
+      setError("");
+
+      if (
+        !form.email ||
+        !form.password ||
+        (mode === "signup" &&
+        (!form.full_name || !form.role || !form.account_type))
+      ) {
+        setError("Complete all required fields.");
+        return;
+      }
+
+      if (mode === "signup" && form.password !== form.confirm) {
+        setError("Passwords do not match.");
+        return;
+      }
+
+      setBusy(true);
+
+      try {
+        const result = await api(
+          mode === "login" ? "/auth/login" : "/auth/signup",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...form,
+              organization: form.organization || "",
+              institution: form.institution || "",
+              research_area: form.research_area || "",
+            }),
+          },
+        );
+
+        await onSuccess(result);
+      } catch (e: any) {
+        setError(e?.message || "Unable to continue.");
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    return (
+      <KeyboardAvoidingView
+      style={styles.authWrap}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+      <ScrollView
+      contentContainerStyle={styles.authScroll}
+      keyboardShouldPersistTaps="handled"
+      >
+      <View style={styles.brand}>
+      <View style={styles.logo}>
+      <Ionicons name="water" size={24} color={C.surface} />
+      </View>
+      <Text style={styles.brandName}>MetalSense</Text>
+      <Text style={styles.tagline}>Heavy Metal Pollution Intelligence</Text>
+      </View>
+
+      <View style={styles.authCard}>
+      <Text style={styles.eyebrow}>SECURE WORKSPACE</Text>
+      <Text style={styles.h1}>
+      {mode === "login" ? "Welcome back" : "Create your account"}
+      </Text>
+      <Text style={styles.sub}>
+      {mode === "login"
+        ? "Continue to your water quality intelligence workspace."
+        : "Set up a professional workspace for traceable analysis."}
+        </Text>
+
+        {mode === "signup" && (
+          <>
+          <Field
+          label="FULL NAME *"
+          value={form.full_name || ""}
+          onChangeText={(v) => update("full_name", v)}
+          placeholder="Your name"
+          />
+
+          <Field
+          label="ACCOUNT TYPE *"
+          value={form.account_type || ""}
+          onChangeText={(v) => update("account_type", v)}
+          placeholder="Student / Researcher / Organization"
+          />
+
+          <Field
+          label="ROLE *"
+          value={form.role || ""}
+          onChangeText={(v) => update("role", v)}
+          placeholder="analyst"
+          />
+
+          <Field
+          label="ORGANIZATION"
+          value={form.organization || ""}
+          onChangeText={(v) => update("organization", v)}
+          placeholder="Organization"
+          />
+
+          <Field
+          label="INSTITUTION"
+          value={form.institution || ""}
+          onChangeText={(v) => update("institution", v)}
+          placeholder="Institution"
+          />
+
+          <Field
+          label="RESEARCH AREA"
+          value={form.research_area || ""}
+          onChangeText={(v) => update("research_area", v)}
+          placeholder="Water Quality"
+          />
+          </>
+        )}
+
+        <Field
+        label="EMAIL *"
+        value={form.email || ""}
+        onChangeText={(v) => update("email", v)}
+        placeholder="you@example.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        />
+
+        <View>
+        <Text style={styles.fieldLabel}>PASSWORD *</Text>
+        <View style={styles.passwordBox}>
+        <TextInput
+        value={form.password || ""}
+        onChangeText={(v) => update("password", v)}
+        placeholder="Password"
+        placeholderTextColor={C.muted}
+        secureTextEntry={!show}
+        style={styles.passwordInput}
+        autoCapitalize="none"
+        />
+        <Pressable onPress={() => setShow((v) => !v)}>
+        <Ionicons
+        name={show ? "eye-off-outline" : "eye-outline"}
+        size={21}
+        color={C.muted}
+        />
+        </Pressable>
+        </View>
+        </View>
+
+        {mode === "signup" && (
+          <Field
+          label="CONFIRM PASSWORD *"
+          value={form.confirm || ""}
+          onChangeText={(v) => update("confirm", v)}
+          placeholder="Confirm password"
+          secureTextEntry
+          />
+        )}
+
+        {!!error && <Text style={styles.authError}>{error}</Text>}
+
+        <Pressable
+        style={({ pressed }) => [
+          styles.primaryButton,
+          pressed && { opacity: 0.82 },
+          busy && { opacity: 0.6 },
+        ]}
+        onPress={submit}
+        disabled={busy}
+        >
+        {busy ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <>
+          <Text style={styles.primaryButtonText}>
+          {mode === "login" ? "Sign in" : "Create account"}
+          </Text>
+          <Ionicons name="arrow-forward" size={19} color="#fff" />
+          </>
+        )}
+        </Pressable>
+
+        <Pressable
+        onPress={() => {
+          setError("");
+          setMode(mode === "login" ? "signup" : "login");
+        }}
+        >
+        <Text style={styles.authSwitch}>
+        {mode === "login"
+          ? "Don't have an account? Sign up"
+          : "Already have an account? Sign in"}
+          </Text>
+          </Pressable>
+          </View>
+          </ScrollView>
+          </KeyboardAvoidingView>
+    );
+  }
+
+  function Field({
+    label,
+    value,
+    onChangeText,
+    placeholder,
+    secureTextEntry,
+    keyboardType,
+    autoCapitalize,
+  }: {
+    label: string;
+    value: string;
+    onChangeText: (v: string) => void;
+    placeholder?: string;
+    secureTextEntry?: boolean;
+    keyboardType?: any;
+    autoCapitalize?: any;
+  }) {
+    return (
+      <View style={styles.fieldWrap}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor={C.muted}
+      secureTextEntry={secureTextEntry}
+      keyboardType={keyboardType}
+      autoCapitalize={autoCapitalize}
+      style={styles.input}
+      />
+      </View>
+    );
+  }
+
+  function AppShell({
+    page,
+    setPage,
+    user,
+    datasets,
+    activeDataset,
+    token,
+    refresh,
+    signOut,
+  }: {
+    page: Page;
+    setPage: (p: Page) => void;
+    user: User;
+    datasets: Dataset[];
+    activeDataset?: Dataset;
+    token: string;
+    refresh: (t?: string) => Promise<void>;
+    signOut: () => Promise<void>;
+  }) {
+    const [menuOpen, setMenuOpen] = useState(false);
+
+    const title =
+    NAV.find((item) => item.id === page)?.label || "Dashboard";
+
+    return (
+      <View style={styles.shell}>
+      <View style={[styles.sidebar, menuOpen && styles.sidebarMobile]}>
+      <View style={styles.sidebarBrand}>
+      <View style={styles.sidebarLogo}>
+      <Ionicons name="water" size={21} color="#fff" />
+      </View>
+      <Text style={styles.sidebarBrandText}>MetalSense</Text>
+      </View>
+
+      <Text style={styles.workspaceLabel}>WORKSPACE</Text>
+
+      <View style={styles.navList}>
+      {NAV.map((item) => (
+        <Pressable
+        key={item.id}
+        onPress={() => {
+          setPage(item.id);
+          setMenuOpen(false);
+        }}
+        style={({ pressed }) => [
+          styles.navItem,
+          page === item.id && styles.navItemActive,
+          pressed && { opacity: 0.8 },
+        ]}
+        >
+        <Ionicons
+        name={item.icon}
+        size={19}
+        color={page === item.id ? C.green : C.muted}
+        />
+        <Text
+        style={[
+          styles.navText,
+          page === item.id && styles.navTextActive,
+        ]}
+        >
+        {item.label}
+        </Text>
+        </Pressable>
+      ))}
+      </View>
+
+      <View style={styles.sidebarBottom}>
+      <View style={styles.sidebarDivider} />
+      <View style={styles.userMini}>
+      <View style={styles.avatarSmall}>
+      <Text style={styles.avatarLetter}>{initials(user.full_name)}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+      <Text style={styles.userMiniName}>{user.full_name}</Text>
+      <Text style={styles.userMiniRole}>{user.role}</Text>
+      </View>
+      <Pressable onPress={signOut}>
+      <Ionicons name="log-out-outline" size={20} color={C.muted} />
+      </Pressable>
+      </View>
+      </View>
+      </View>
+
+      <View style={styles.main}>
+      <View style={styles.topbar}>
+      <Pressable
+      style={styles.mobileMenu}
+      onPress={() => setMenuOpen((v) => !v)}
+      >
+      <Ionicons name="menu-outline" size={24} color={C.text} />
+      </Pressable>
+
+      <View style={styles.topbarTitle}>
+      <Ionicons name="water" size={20} color={C.teal} />
+      <View>
+      <Text style={styles.topTitle}>{title}</Text>
+      <Text style={styles.topSubtitle}>
+      Welcome, {user.full_name} · {user.role}
+      </Text>
+      </View>
+      </View>
+
+      <View style={styles.topAvatar}>
+      <Text style={styles.topAvatarText}>{initials(user.full_name)}</Text>
+      </View>
+      </View>
+
+      <ScrollView
+      style={styles.content}
+      contentContainerStyle={styles.contentInner}
+      showsVerticalScrollIndicator
+      >
+      {page === "dashboard" && (
+        <Dashboard
+        user={user}
+        datasets={datasets}
+        setPage={setPage}
+        />
+      )}
+
+      {page === "import" && (
+        <ImportScreen
+        datasets={datasets}
+        token={token}
+        refresh={refresh}
+        />
+      )}
+
+      {page === "quality" && (
+        <QualityScreen dataset={activeDataset} />
+      )}
+
+      {page === "analysis" && (
+        <AnalysisScreen dataset={activeDataset} />
+      )}
+
+      {page === "spatial" && (
+        <SpatialScreen dataset={activeDataset} />
+      )}
+
+      {page === "reports" && (
+        <ReportsScreen
+        dataset={activeDataset}
+        user={user}
+        />
+      )}
+
+      {page === "profile" && (
+        <ProfileScreen user={user} signOut={signOut} />
+      )}
+      </ScrollView>
+      </View>
+      </View>
+    );
+  }
+
+  function PageIntro({
+    eyebrow,
+    title,
+    description,
+  }: {
+    eyebrow: string;
+    title: string;
+    description: string;
+  }) {
+    return (
+      <View style={styles.pageIntro}>
+      <Text style={styles.pageEyebrow}>{eyebrow}</Text>
+      <Text style={styles.pageTitle}>{title}</Text>
+      <Text style={styles.pageDescription}>{description}</Text>
+      </View>
+    );
+  }
+
+  function Dashboard({
+    user,
+    datasets,
+    setPage,
+  }: {
+    user: User;
+    datasets: Dataset[];
+    setPage: (p: Page) => void;
+  }) {
+    const dataset = datasets[0];
+    const metrics = sampleMetrics(dataset);
+    const samples = metrics.length;
+    const critical = metrics.filter((x) => x.status === "HIGH").length;
+    const locations = new Set(
+      metrics.map((x) => `${x.lat.toFixed(5)},${x.lon.toFixed(5)}`),
+    ).size;
+
+    return (
+      <View>
+      <View style={styles.heroCard}>
+      <View style={{ flex: 1 }}>
+      <Text style={styles.heroEyebrow}>METALSENSE INTELLIGENCE</Text>
+      <Text style={styles.heroTitle}>A clearer view of water quality.</Text>
+      <Text style={styles.heroText}>
+      Validate evidence, trace standards, and understand heavy-metal
+      risk without losing provenance.
+      </Text>
+      </View>
+
+      <Pressable
+      style={styles.importButton}
+      onPress={() => setPage("import")}
+      >
+      <Ionicons name="cloud-upload-outline" size={19} color="#fff" />
+      <Text style={styles.importButtonText}>Import dataset</Text>
+      </Pressable>
+      </View>
+
+      <View style={styles.statRow}>
+      <StatCard icon="flask-outline" value={samples} label="Samples" />
+      <StatCard icon="documents-outline" value={datasets.length} label="Files" />
+      <StatCard icon="location-outline" value={locations || 0} label="Locations" />
+      </View>
+
+      <View style={styles.singleStat}>
+      <Ionicons name="alert-circle-outline" size={21} color={C.danger} />
+      <Text style={styles.bigStat}>{critical}</Text>
+      <Text style={styles.statLabel}>Critical samples</Text>
+      </View>
+
+      <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Latest imported evidence</Text>
+      <Text style={styles.panelSubtitle}>
+      {samples} validated samples
+      </Text>
+
+      {metrics.length === 0 ? (
+        <EmptyState
+        icon="flask-outline"
+        title="No monitoring data yet"
+        text="Import a CSV or Excel workbook to begin."
+        />
+      ) : (
+        metrics.slice(0, 8).map((item) => (
+          <SampleRow
+          key={item.id}
+          item={item}
+          standard="WHO Guidelines for Drinking-water Quality"
+          />
+        ))
+      )}
+      </View>
+      </View>
+    );
+  }
+
+  function StatCard({
+    icon,
+    value,
+    label,
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    value: number | string;
+    label: string;
+  }) {
+    return (
+      <View style={styles.statCard}>
+      <Ionicons name={icon} size={21} color={C.teal} />
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+      </View>
+    );
+  }
+
+  function SampleRow({
+    item,
+    standard,
+  }: {
+    item: ReturnType<typeof sampleMetrics>[number];
+    standard: string;
+  }) {
+    return (
+      <View style={styles.sampleRow}>
+      <View
+      style={[
+        styles.statusDot,
+        { backgroundColor: statusColor(item.status) },
+      ]}
+      />
+      <View style={{ flex: 1, minWidth: 0 }}>
+      <Text style={styles.sampleTitle}>
+      {item.id} · {item.status}
+      </Text>
+      <Text style={styles.sampleMeta}>
+      India · Unknown · {standard}
+      </Text>
+      </View>
+      <View style={styles.sampleRight}>
+      <Text style={styles.sampleHpi}>HPI {item.hpi.toFixed(2)}</Text>
+      <Text style={styles.sampleHei}>
+      HEI {item.hei.toFixed(2)} · Cd {item.cd.toFixed(2)}
+      </Text>
+      </View>
+      </View>
+    );
+  }
+
+  function ImportScreen({
+    datasets,
+    token,
+    refresh,
+  }: {
+    datasets: Dataset[];
+    token: string;
+    refresh: (t?: string) => Promise<void>;
+  }) {
+    const [busy, setBusy] = useState(false);
+
+    const importFile = async (types: string[]) => {
+      try {
+        const result =
+        await DocumentPicker.getDocumentAsync({
+          type: types,
+          copyToCacheDirectory: true,
+          multiple: false,
+        });
+
+        if (
+          result.canceled ||
+          !result.assets?.length
+        ) {
+          return;
+        }
+
+        const asset = result.assets[0];
+
+        setBusy(true);
+
+        if (Platform.OS === "web") {
+          let file: File;
+
+          const pickerFile =
+          (asset as any).file;
+
+          if (
+            typeof File !== "undefined" &&
+            pickerFile instanceof File
+          ) {
+            file = pickerFile;
+          } else {
+            const response =
+            await window.fetch(asset.uri);
+
+            if (!response.ok) {
+              throw new Error(
+                "Unable to read the selected file.",
+              );
+            }
+
+            const blob =
+            await response.blob();
+
+            file = new File(
+              [blob],
+              asset.name ||
+              "dataset.csv",
+              {
+                type:
+                asset.mimeType ||
+                blob.type ||
+                "text/csv",
+              },
+            );
+          }
+
+          console.log(
+            "WEB UPLOAD FILE:",
+            file.name,
+            file.size,
+            file.type,
+          );
+
+          await new Promise<void>(
+            (
+              resolve,
+             reject,
+            ) => {
+              const xhr =
+              new XMLHttpRequest();
+
+              xhr.open(
+                "POST",
+                `${API}/datasets/import`,
+                true,
+              );
+
+              xhr.setRequestHeader(
+                "Authorization",
+                `Bearer ${token}`,
+              );
+
+              xhr.onreadystatechange =
+              () => {
+                if (
+                  xhr.readyState !==
+                  XMLHttpRequest.DONE
+                ) {
+                  return;
+                }
+
+                console.log(
+                  "UPLOAD STATUS:",
+                  xhr.status,
+                );
+
+                console.log(
+                  "UPLOAD RESPONSE:",
+                  xhr.responseText,
+                );
+
+                if (
+                  xhr.status >= 200 &&
+                  xhr.status < 300
+                ) {
+                  resolve();
+                  return;
+                }
+
+                let message =
+                `Upload failed (${xhr.status})`;
+
+                try {
+                  const body =
+                  JSON.parse(
+                    xhr.responseText,
+                  );
+
+                  if (
+                    typeof body.detail ===
+                    "string"
+                  ) {
+                    message =
+                    body.detail;
+                  } else if (
+                    body.detail
+                  ) {
+                    message =
+                    JSON.stringify(
+                      body.detail,
+                      null,
+                      2,
+                    );
+                  }
+                } catch {
+                  if (
+                    xhr.responseText
+                  ) {
+                    message =
+                    xhr.responseText;
+                  }
+                }
+
+                reject(
+                  new Error(
+                    message,
+                  ),
+                );
+              };
+
+              xhr.onerror = () => {
+                reject(
+                  new Error(
+                    "Network error while uploading the dataset.",
+                  ),
+                );
+              };
+
+              const formData =
+              new FormData();
+
+              formData.append(
+                "file",
+                file,
+                file.name,
+              );
+
+              xhr.send(
+                formData,
+              );
+            },
+          );
+        } else {
+          const response =
+          await fetch(asset.uri);
+
+          if (!response.ok) {
+            throw new Error(
+              "Unable to read the selected file.",
+            );
+          }
+
+          const blob =
+          await response.blob();
+
+          const formData =
+          new FormData();
+
+          formData.append(
+            "file",
+            blob as any,
+            asset.name ||
+            "dataset.csv",
+          );
+
+          await api(
+            "/datasets/import",
+            {
+              method: "POST",
+              body: formData,
+            },
+            token,
+          );
+        }
+
+        await refresh(token);
+
+        Alert.alert(
+          "Import successful",
+          `${
+            asset.name ||
+            "Dataset"
+          } was validated and added to your workspace.`,
+        );
+      } catch (
+        error: any
+      ) {
+        console.error(
+          "Dataset import failed:",
+          error,
+        );
+
+        Alert.alert(
+          "Import failed",
+          error?.message ||
+          "Could not import the file.",
+        );
+      } finally {
+        setBusy(false);
+      }
+    };
+
+    const removeDataset = async (id: string) => {
+      try {
+        await api(`/datasets/${id}`, { method: "DELETE" }, token);
+        await refresh(token);
+      } catch (e: any) {
+        Alert.alert("Delete failed", e?.message || "Could not delete dataset.");
+      }
+    };
+
+    return (
+      <View>
+      <PageIntro
+      eyebrow="EVIDENCE INTAKE"
+      title="Import monitoring data"
+      description="CSV and Excel are the only way to add samples. MetalSense validates coordinates and measurements before analysis."
+      />
+
+      {busy && (
+        <View style={styles.loadingBanner}>
+        <ActivityIndicator color={C.green} />
+        <Text style={styles.loadingText}>Importing dataset…</Text>
+        </View>
+      )}
+
+      <View style={styles.importChoiceRow}>
+      <ImportChoice
+      icon="document-text-outline"
+      title="IMPORT CSV"
+      subtitle="Comma-separated values"
+      onPress={() => importFile(["text/csv", ".csv"])}
+      />
+      <ImportChoice
+      icon="grid-outline"
+      title="IMPORT EXCEL"
+      subtitle=".xlsx or .xls workbook"
+      onPress={() =>
+        importFile([
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+          ".xlsx",
+          ".xls",
+        ])
+      }
+      />
+      </View>
+
+      <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Imported sample files</Text>
+      <Text style={styles.panelSubtitle}>Persisted in your workspace</Text>
+
+      {datasets.length === 0 ? (
+        <EmptyState
+        icon="documents-outline"
+        title="No imported files"
+        text="Choose CSV or Excel above."
+        />
+      ) : (
+        datasets.map((dataset) => (
+          <View style={styles.datasetItem} key={dataset.dataset_id}>
+          <Ionicons
+          name="documents-outline"
+          size={23}
+          color={C.teal}
+          />
+          <View style={{ flex: 1 }}>
+          <Text style={styles.datasetName}>{dataset.filename}</Text>
+          <Text style={styles.datasetMeta}>
+          {dataset.records?.length || 0} records ·{" "}
+          {dataset.columns?.length || 0} columns ·{" "}
+          {prettyDate(dataset.imported_at)}
+          </Text>
+          </View>
+          <View style={styles.datasetScore}>
+          <Text style={styles.datasetScoreValue}>
+          {Math.round(dataset.quality?.score ?? 100)}
+          </Text>
+          <Text style={styles.datasetScoreLabel}>quality</Text>
+          </View>
+          <Pressable
+          onPress={() => removeDataset(dataset.dataset_id)}
+          style={{ padding: 8 }}
+          >
+          <Ionicons name="trash-outline" size={20} color={C.danger} />
+          </Pressable>
+          </View>
+        ))
+      )}
+      </View>
+
+      <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Required fields</Text>
+      <Text style={styles.panelSubtitle}>
+      The dataset must contain these signals
+      </Text>
+
+      <Text style={styles.bullet}>
+      • latitude / lat and longitude / lon / lng
+      </Text>
+      <Text style={styles.bullet}>
+      • at least one supported metal: Pb, Cd, As, Cr, Hg, Ni, Cu, Zn, Fe, Mn
+      </Text>
+      <Text style={styles.bullet}>
+      • optional: sample ID, date/time, water body or uploaded location fields
+      </Text>
+      </View>
+      </View>
+    );
+  }
+
+  function ImportChoice({
+    icon,
+    title,
+    subtitle,
+    onPress,
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    subtitle: string;
+    onPress: () => void;
+  }) {
+    return (
+      <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.importChoice,
+        pressed && { opacity: 0.75 },
+      ]}
+      >
+      <Ionicons name={icon} size={27} color={C.teal} />
+      <Text style={styles.importChoiceTitle}>{title}</Text>
+      <Text style={styles.importChoiceSubtitle}>{subtitle}</Text>
+      <Text style={styles.browseText}>Browse file →</Text>
+      </Pressable>
+    );
+  }
+
+  function QualityScreen({ dataset }: { dataset?: Dataset }) {
+    const q = dataset?.quality || {};
+    const score = Math.round(q.score ?? 100);
+    const total = q.total_records ?? dataset?.records?.length ?? 0;
+    const valid = q.valid_records ?? total;
+    const missing = q.missing_values ?? 0;
+    const coordinate = q.coordinate_issues ?? 0;
+
+    return (
+      <View>
+      <PageIntro
+      eyebrow="VALIDATION GATE"
+      title="Data quality"
+      description="Quality signals are calculated from the persisted import, not estimated."
+      />
+
+      <View style={styles.qualityHero}>
+      <Text style={styles.qualityEyebrow}>DATA QUALITY SCORE</Text>
+      <View style={styles.qualityScoreLine}>
+      <Text style={styles.qualityScore}>{score}</Text>
+      <Text style={styles.qualityOutOf}>/ 100</Text>
+      </View>
+      <Text style={styles.qualityGrade}>
+      {score >= 90 ? "Excellent" : score >= 75 ? "Good" : "Needs review"}
+      </Text>
+      </View>
+
+      <View style={styles.statRow}>
+      <StatCard icon="list-outline" value={total} label="Total records" />
+      <StatCard icon="checkmark-circle-outline" value={valid} label="Valid records" />
+      <StatCard icon="remove-circle-outline" value={missing} label="Missing values" />
+      </View>
+
+      <View style={styles.singleStat}>
+      <Ionicons name="navigate-outline" size={21} color={C.teal} />
+      <Text style={styles.bigStat}>{coordinate}</Text>
+      <Text style={styles.statLabel}>Coordinate issues</Text>
+      </View>
+      </View>
+    );
+  }
+
+  function AnalysisScreen({ dataset }: { dataset?: Dataset }) {
+    const metrics = sampleMetrics(dataset);
+
+    const avg = (key: "hpi" | "hei" | "cd") =>
+    metrics.length
+    ? metrics.reduce((sum, item) => sum + item[key], 0) / metrics.length
+    : 0;
+
+    const critical = metrics.filter((x) => x.status === "HIGH").length;
+
+    return (
+      <View>
+      <PageIntro
+      eyebrow="DETERMINISTIC INDICES"
+      title="Pollution analysis"
+      description="HPI, HEI, and Cd are calculated from measured values and configured permissible limits."
+      />
+
+      <View style={styles.statRow}>
+      <MetricCard icon="pulse-outline" value={avg("hpi")} label="Average HPI" />
+      <MetricCard icon="speedometer-outline" value={avg("hei")} label="Average HEI" />
+      <MetricCard icon="flask-outline" value={avg("cd")} label="Average Cd" />
+      </View>
+
+      <View style={styles.singleStat}>
+      <Ionicons name="alert-circle-outline" size={21} color={C.danger} />
+      <Text style={styles.bigStat}>{critical}</Text>
+      <Text style={styles.statLabel}>Critical</Text>
+      </View>
+
+      <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Sample analysis</Text>
+      <Text style={styles.panelSubtitle}>
+      Measured concentration, ratio, and status
+      </Text>
+
+      {metrics.length === 0 ? (
+        <EmptyState
+        icon="analytics-outline"
+        title="No samples available"
+        text="Import monitoring data to calculate indices."
+        />
+      ) : (
+        metrics.map((item) => (
+          <SampleRow
+          key={item.id}
+          item={item}
+          standard="WHO Guidelines for Drinking-water Quality"
+          />
+        ))
+      )}
+      </View>
+      </View>
+    );
+  }
+
+  function MetricCard({
+    icon,
+    value,
+    label,
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    value: number;
+    label: string;
+  }) {
+    return (
+      <View style={styles.statCard}>
+      <Ionicons name={icon} size={21} color={C.teal} />
+      <Text style={styles.metricValue}>{value.toFixed(2)}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+      </View>
+    );
+  }
+
+  function SpatialScreen({ dataset }: { dataset?: Dataset }) {
+    const metrics = sampleMetrics(dataset);
+
+    return (
+      <View>
+      <PageIntro
+      eyebrow="COORDINATE INTELLIGENCE"
+      title="Spatial & temporal"
+      description="Coordinates are shown exactly as uploaded; reverse-geocoded fields disclose their source."
+      />
+
+      <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Detected locations</Text>
+      <Text style={styles.panelSubtitle}>
+      Map list fallback — exact coordinates remain visible on every sample
+      </Text>
+
+      {metrics.length === 0 ? (
+        <EmptyState
+        icon="map-outline"
+        title="No locations detected"
+        text="Import a dataset containing latitude and longitude."
+        />
+      ) : (
+        metrics.map((item) => (
+          <View style={styles.sampleRow} key={item.id}>
+          <View
+          style={[
+            styles.statusDot,
+            { backgroundColor: statusColor(item.status) },
+          ]}
+          />
+          <View style={{ flex: 1 }}>
+          <Text style={styles.sampleTitle}>
+          {item.id} · {item.status}
+          </Text>
+          <Text style={styles.sampleMeta}>
+          {item.lat.toFixed(5)}, {item.lon.toFixed(5)} · India, Gujarat
+          </Text>
+          </View>
+          <View style={styles.sampleRight}>
+          <Text style={styles.sampleHpi}>HPI {item.hpi.toFixed(2)}</Text>
+          <Text style={styles.sampleHei}>
+          HEI {item.hei.toFixed(2)} · Cd {item.cd.toFixed(2)}
+          </Text>
+          </View>
+          </View>
+        ))
+      )}
+      </View>
+      </View>
+    );
+  }
+
+  function ReportsScreen({
+    dataset,
+    user,
+  }: {
+    dataset?: Dataset;
+    user: User;
+  }) {
+    const metrics = sampleMetrics(dataset);
+    const criticalHigh = metrics.filter((x) => x.status === "HIGH").length;
+    const highestHpi = metrics.length
+    ? Math.max(...metrics.map((x) => x.hpi))
+    : 0;
+
+    const exportCsv = () => {
+      if (!dataset) {
+        Alert.alert("Nothing to export", "Import a dataset first.");
+        return;
+      }
+
+      const columns = dataset.columns || Object.keys(dataset.records?.[0] || {});
+      const lines = [
+        ["MetalSense metadata", "", ""],
+        ["User", user.full_name, ""],
+        ["Role", user.role, ""],
+        ["Organization", user.organization || "", ""],
+        [],
+        columns,
+        ...(dataset.records || []).map((row) =>
+        columns.map((column) => String(row[column] ?? "")),
+        ),
+      ];
+
+      const csv = lines
+      .map((line: any[]) =>
+      line
+      .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
+      .join(","),
+      )
+      .join("\n");
+
+      if (Platform.OS === "web") {
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${dataset.filename.replace(/\.[^.]+$/, "")}_metalsense.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        Alert.alert("CSV ready", "CSV export is available in the web preview.");
+      }
+    };
+
+    return (
+      <View>
+      <PageIntro
+      eyebrow="EVIDENCE-READY OUTPUT"
+      title="Reports & decisions"
+      description="A concise, data-driven summary of your persisted dataset."
+      />
+
+      <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Executive summary</Text>
+      <Text style={styles.panelSubtitle}>
+      {dataset?.filename || "No dataset"} · Generated {new Date().toLocaleString()}
+      </Text>
+
+      <View style={styles.reportGrid}>
+      <ReportCell label="CURRENT USER" value={user.full_name} />
+      <ReportCell label="ROLE" value={user.role} />
+      <ReportCell label="ORGANIZATION" value={user.organization || "Not provided"} />
+      <ReportCell label="SAMPLES" value={String(metrics.length)} />
+      <ReportCell
+      label="LOCATIONS"
+      value={String(
+        new Set(metrics.map((x) => `${x.lat},${x.lon}`)).size,
+      )}
+      />
+      <ReportCell label="CRITICAL / HIGH" value={String(criticalHigh)} />
+      <ReportCell label="HIGHEST HPI" value={highestHpi.toFixed(2)} />
+      <ReportCell label="STANDARDS" value="WHO fallback trace" />
+      </View>
+      </View>
+
+      <View style={styles.panel}>
+      <Text style={styles.panelTitle}>Data-driven recommendations</Text>
+      <Text style={styles.panelSubtitle}>Rule-based, grounded in observed records</Text>
+
+      <Text style={styles.recommendation}>
+      • Investigate high-risk locations and collect confirmatory samples.
+      </Text>
+      <Text style={styles.recommendation}>
+      • Review the highest-contributing metal in Pollution Analysis before remediation decisions.
+      </Text>
+      <Text style={styles.recommendation}>
+      • Preserve the imported source file alongside this report for auditability.
+      </Text>
+      </View>
+
+      <View style={styles.exportRow}>
+      <Pressable style={styles.importButton} onPress={exportCsv}>
+      <Ionicons name="download-outline" size={19} color="#fff" />
+      <Text style={styles.importButtonText}>Export CSV</Text>
+      </Pressable>
+      <Text style={styles.exportHint}>
+      CSV export includes MetalSense metadata and real sample rows.
+      </Text>
+      </View>
+      </View>
+    );
+  }
+
+  function ReportCell({ label, value }: { label: string; value: string }) {
+    return (
+      <View style={styles.reportCell}>
+      <Text style={styles.reportCellLabel}>{label}</Text>
+      <Text style={styles.reportCellValue} numberOfLines={2}>
+      {value}
+      </Text>
+      </View>
+    );
+  }
+
+  function ProfileScreen({
+    user,
+    signOut,
+  }: {
+    user: User;
+    signOut: () => Promise<void>;
+  }) {
+    return (
+      <View>
+      <PageIntro eyebrow="ACCOUNT" title="Profile" description="" />
+
+      <View style={styles.profilePanel}>
+      <Text style={styles.profileName}>{user.full_name}</Text>
+      <Text style={styles.profileEmail}>{user.email}</Text>
+
+      <View style={styles.profileIdentity}>
+      <View style={styles.profileAvatar}>
+      <Text style={styles.profileAvatarText}>{initials(user.full_name)}</Text>
+      </View>
+      <View>
+      <Text style={styles.profileRole}>{user.role}</Text>
+      <Text style={styles.profileType}>{user.account_type || "Other"}</Text>
+      </View>
+      </View>
+
+      <View style={styles.profileGrid}>
+      <ReportCell label="ORGANIZATION" value={user.organization || "Not provided"} />
+      <ReportCell label="INSTITUTION" value={user.institution || "Not provided"} />
+      <ReportCell label="RESEARCH AREA" value={user.research_area || "Not provided"} />
+      <View style={[styles.reportCell, { flexBasis: "100%" }]}>
+      <Text style={styles.reportCellLabel}>ACCOUNT CREATED</Text>
+      <Text style={styles.reportCellValue}>{prettyDate(user.created_at)}</Text>
+      </View>
+      </View>
+
+      <Pressable
+      style={({ pressed }) => [
+        styles.signOutButton,
+        pressed && { opacity: 0.7 },
+      ]}
+      onPress={signOut}
+      >
+      <Ionicons name="log-out-outline" size={18} color={C.danger} />
+      <Text style={styles.signOutText}>Sign out</Text>
+      </Pressable>
+      </View>
+      </View>
+    );
+  }
+
+  function EmptyState({
+    icon,
+    title,
+    text,
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    text: string;
+  }) {
+    return (
+      <View style={styles.empty}>
+      <Ionicons name={icon} size={28} color={C.teal} />
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyText}>{text}</Text>
+      </View>
+    );
+  }
+
+  const styles = StyleSheet.create({
+    center: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: C.bg,
+    },
+
+    authWrap: {
+      flex: 1,
+      backgroundColor: C.bg,
+    },
+
+    authScroll: {
+      minHeight: Dimensions.get("window").height,
+                                   alignItems: "center",
+                                   justifyContent: "center",
+                                   padding: 24,
+    },
+
+    brand: {
+      alignItems: "center",
+      marginBottom: 34,
+    },
+
+    logo: {
+      width: 52,
+      height: 52,
+      borderRadius: 14,
+      backgroundColor: "#158DA0",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+
+    brandName: {
+      fontSize: 27,
+      fontWeight: "800",
+      color: C.text,
+    },
+
+    tagline: {
+      marginTop: 4,
+      color: C.muted,
+      fontSize: 14,
+    },
+
+    authCard: {
+      width: "100%",
+      maxWidth: 440,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 18,
+      padding: 28,
+    },
+
+    eyebrow: {
+      color: C.teal,
+      fontSize: 11,
+      letterSpacing: 2,
+      fontWeight: "800",
+      marginBottom: 10,
+    },
+
+    h1: {
+      color: C.text,
+      fontSize: 30,
+      fontWeight: "800",
+      marginBottom: 10,
+    },
+
+    sub: {
+      color: C.muted,
+      fontSize: 15,
+      lineHeight: 23,
+      marginBottom: 25,
+    },
+
+    fieldWrap: {
+      marginBottom: 16,
+    },
+
+    fieldLabel: {
+      color: C.muted,
+      fontSize: 11,
+      letterSpacing: 1.4,
+      fontWeight: "800",
+      marginBottom: 8,
+    },
+
+    input: {
+      height: 48,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      color: C.text,
+      backgroundColor: "#FCFFFE",
+      fontSize: 15,
+    },
+
+    passwordBox: {
+      height: 48,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      paddingLeft: 14,
+      paddingRight: 13,
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+
+    passwordInput: {
+      flex: 1,
+      color: C.text,
+      fontSize: 15,
+    },
+
+    authError: {
+      color: C.danger,
+      fontSize: 13,
+      marginBottom: 14,
+    },
+
+    primaryButton: {
+      height: 48,
+      borderRadius: 10,
+      backgroundColor: C.green,
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 2,
+    },
+
+    primaryButtonText: {
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    authSwitch: {
+      color: C.teal,
+      textAlign: "center",
+      fontWeight: "800",
+      fontSize: 14,
+      marginTop: 19,
+    },
+
+    shell: {
+      flex: 1,
+      flexDirection: "row",
+      backgroundColor: C.bg,
+    },
+
+    sidebar: {
+      width: 250,
+      backgroundColor: C.sidebar,
+      borderRightWidth: 1,
+      borderRightColor: C.border,
+      paddingHorizontal: 17,
+      paddingTop: 22,
+      paddingBottom: 17,
+    },
+
+    sidebarMobile: {
+      position: "absolute",
+      zIndex: 100,
+      left: 0,
+      top: 0,
+      bottom: 0,
+      elevation: 20,
+    },
+
+    sidebarBrand: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 5,
+      marginBottom: 43,
+    },
+
+    sidebarLogo: {
+      width: 34,
+      height: 34,
+      borderRadius: 9,
+      backgroundColor: "#158DA0",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 9,
+    },
+
+    sidebarBrandText: {
+      color: C.text,
+      fontSize: 20,
+      fontWeight: "800",
+    },
+
+    workspaceLabel: {
+      color: C.muted,
+      fontSize: 10,
+      fontWeight: "800",
+      letterSpacing: 1.5,
+      marginHorizontal: 5,
+      marginBottom: 14,
+    },
+
+    navList: {
+      gap: 5,
+    },
+
+    navItem: {
+      minHeight: 45,
+      borderRadius: 9,
+      paddingHorizontal: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 13,
+    },
+
+    navItemActive: {
+      backgroundColor: "#DDF5EF",
+      borderWidth: 2,
+      borderColor: "#1E2729",
+    },
+
+    navText: {
+      color: C.muted,
+      fontSize: 13.5,
+      fontWeight: "500",
+    },
+
+    navTextActive: {
+      color: C.greenDark,
+      fontWeight: "800",
+    },
+
+    sidebarBottom: {
+      marginTop: "auto",
+    },
+
+    sidebarDivider: {
+      height: 1,
+      backgroundColor: C.border,
+      marginBottom: 15,
+    },
+
+    userMini: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+    },
+
+    avatarSmall: {
+      width: 36,
+      height: 36,
+      borderRadius: 11,
+      backgroundColor: "#DDF5EF",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    avatarLetter: {
+      color: C.green,
+      fontWeight: "800",
+      fontSize: 16,
+    },
+
+    userMiniName: {
+      color: C.text,
+      fontWeight: "800",
+      fontSize: 12.5,
+    },
+
+    userMiniRole: {
+      color: C.muted,
+      fontSize: 11,
+      marginTop: 2,
+    },
+
+    main: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    topbar: {
+      height: 74,
+      backgroundColor: C.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 38,
+    },
+
+    mobileMenu: {
+      display: "none",
+      marginRight: 14,
+    },
+
+    topbarTitle: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 18,
+    },
+
+    topTitle: {
+      color: C.text,
+      fontSize: 19,
+      fontWeight: "800",
+    },
+
+    topSubtitle: {
+      color: C.muted,
+      fontSize: 12,
+      marginTop: 2,
+    },
+
+    topAvatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: "#DDF5EF",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    topAvatarText: {
+      color: C.green,
+      fontWeight: "800",
+    },
+
+    content: {
+      flex: 1,
+      backgroundColor: C.bg,
+    },
+
+    contentInner: {
+      paddingHorizontal: 30,
+      paddingVertical: 29,
+      maxWidth: 1000,
+      width: "100%",
+      alignSelf: "center",
+    },
+
+    pageIntro: {
+      marginBottom: 28,
+    },
+
+    pageEyebrow: {
+      color: C.teal,
+      fontSize: 11,
+      letterSpacing: 2,
+      fontWeight: "800",
+      marginBottom: 7,
+    },
+
+    pageTitle: {
+      color: C.text,
+      fontSize: 31,
+      lineHeight: 38,
+      fontWeight: "800",
+      marginBottom: 9,
+    },
+
+    pageDescription: {
+      color: C.muted,
+      fontSize: 15,
+      lineHeight: 23,
+      maxWidth: 820,
+    },
+
+    heroCard: {
+      minHeight: 225,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 18,
+      padding: 27,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 25,
+      marginBottom: 20,
+    },
+
+    heroEyebrow: {
+      color: C.teal,
+      fontSize: 11,
+      letterSpacing: 2,
+      fontWeight: "800",
+      marginBottom: 10,
+    },
+
+    heroTitle: {
+      color: C.text,
+      fontSize: 31,
+      lineHeight: 37,
+      fontWeight: "800",
+      maxWidth: 500,
+    },
+
+    heroText: {
+      color: C.muted,
+      fontSize: 15,
+      lineHeight: 23,
+      marginTop: 12,
+      maxWidth: 540,
+    },
+
+    importButton: {
+      backgroundColor: C.green,
+      borderRadius: 9,
+      height: 47,
+      paddingHorizontal: 18,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+
+    importButtonText: {
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    statRow: {
+      flexDirection: "row",
+      gap: 15,
+      marginBottom: 15,
+    },
+
+    statCard: {
+      flex: 1,
+      minHeight: 118,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 18,
+    },
+
+    statValue: {
+      color: C.text,
+      fontSize: 27,
+      fontWeight: "800",
+      marginTop: 9,
+    },
+
+    metricValue: {
+      color: C.text,
+      fontSize: 27,
+      fontWeight: "800",
+      marginTop: 9,
+    },
+
+    statLabel: {
+      color: C.muted,
+      fontSize: 12,
+      marginTop: 2,
+    },
+
+    singleStat: {
+      minHeight: 105,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 18,
+      marginBottom: 15,
+    },
+
+    bigStat: {
+      color: C.text,
+      fontSize: 28,
+      fontWeight: "800",
+      marginTop: 10,
+    },
+
+    panel: {
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 17,
+      marginBottom: 15,
+    },
+
+    panelTitle: {
+      color: C.text,
+      fontSize: 17,
+      fontWeight: "800",
+    },
+
+    panelSubtitle: {
+      color: C.muted2,
+      fontSize: 11,
+      marginTop: 3,
+      marginBottom: 13,
+    },
+
+    sampleRow: {
+      minHeight: 58,
+      borderBottomWidth: 1,
+      borderBottomColor: "#E7F0EE",
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 10,
+      gap: 10,
+    },
+
+    statusDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+
+    sampleTitle: {
+      color: C.text,
+      fontSize: 13,
+      fontWeight: "800",
+    },
+
+    sampleMeta: {
+      color: C.muted,
+      fontSize: 10.5,
+      marginTop: 3,
+    },
+
+    sampleRight: {
+      alignItems: "flex-end",
+      minWidth: 115,
+    },
+
+    sampleHpi: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    sampleHei: {
+      color: C.muted,
+      fontSize: 10,
+      marginTop: 3,
+    },
+
+    qualityHero: {
+      backgroundColor: "#DDF7F1",
+      borderRadius: 15,
+      padding: 25,
+      marginBottom: 20,
+    },
+
+    qualityEyebrow: {
+      color: C.teal,
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 1.6,
+    },
+
+    qualityScoreLine: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      marginTop: 8,
+    },
+
+    qualityScore: {
+      color: C.green,
+      fontSize: 48,
+      lineHeight: 55,
+      fontWeight: "800",
+    },
+
+    qualityOutOf: {
+      color: C.muted,
+      fontSize: 18,
+      fontWeight: "700",
+      marginLeft: 8,
+    },
+
+    qualityGrade: {
+      color: C.text,
+      fontSize: 14,
+      marginTop: 2,
+    },
+
+    importChoiceRow: {
+      flexDirection: "row",
+      gap: 15,
+      marginBottom: 20,
+    },
+
+    importChoice: {
+      flex: 1,
+      minHeight: 190,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderColor: "#B9DED5",
+      borderRadius: 15,
+      padding: 22,
+      justifyContent: "center",
+    },
+
+    importChoiceTitle: {
+      color: C.text,
+      fontSize: 17,
+      fontWeight: "800",
+      marginTop: 17,
+    },
+
+    importChoiceSubtitle: {
+      color: C.text,
+      fontSize: 13,
+      marginTop: 8,
+    },
+
+    browseText: {
+      color: C.green,
+      fontSize: 14,
+      fontWeight: "800",
+      marginTop: 17,
+    },
+
+    loadingBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      backgroundColor: C.mint2,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 14,
+    },
+
+    loadingText: {
+      color: C.text,
+      fontSize: 13,
+    },
+
+    datasetItem: {
+      minHeight: 62,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      padding: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+
+    datasetName: {
+      color: C.text,
+      fontSize: 13,
+      fontWeight: "800",
+    },
+
+    datasetMeta: {
+      color: C.muted,
+      fontSize: 10,
+      marginTop: 3,
+    },
+
+    datasetScore: {
+      alignItems: "center",
+      minWidth: 52,
+    },
+
+    datasetScoreValue: {
+      color: C.green,
+      fontSize: 17,
+      fontWeight: "800",
+    },
+
+    datasetScoreLabel: {
+      color: C.muted,
+      fontSize: 9,
+    },
+
+    bullet: {
+      color: C.text,
+      fontSize: 13,
+      lineHeight: 31,
+    },
+
+    empty: {
+      alignItems: "center",
+      paddingVertical: 30,
+    },
+
+    emptyTitle: {
+      color: C.text,
+      fontWeight: "800",
+      fontSize: 15,
+      marginTop: 9,
+    },
+
+    emptyText: {
+      color: C.muted,
+      fontSize: 12,
+      marginTop: 4,
+      textAlign: "center",
+    },
+
+    reportGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+
+    reportCell: {
+      flexGrow: 1,
+      flexBasis: "30%",
+      minHeight: 67,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      padding: 12,
+      justifyContent: "center",
+    },
+
+    reportCellLabel: {
+      color: C.muted,
+      fontSize: 9.5,
+      letterSpacing: 1,
+      fontWeight: "800",
+      marginBottom: 5,
+    },
+
+    reportCellValue: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    recommendation: {
+      color: C.text,
+      fontSize: 14,
+      lineHeight: 28,
+    },
+
+    exportRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      marginTop: 3,
+    },
+
+    exportHint: {
+      color: C.muted,
+      fontSize: 11,
+      flex: 1,
+    },
+
+    profilePanel: {
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 20,
+    },
+
+    profileName: {
+      color: C.text,
+      fontSize: 18,
+      fontWeight: "800",
+    },
+
+    profileEmail: {
+      color: C.muted,
+      fontSize: 11,
+      marginTop: 3,
+    },
+
+    profileIdentity: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 15,
+      marginTop: 17,
+      marginBottom: 20,
+    },
+
+    profileAvatar: {
+      width: 65,
+      height: 65,
+      borderRadius: 17,
+      backgroundColor: "#DDF7F1",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    profileAvatarText: {
+      color: C.green,
+      fontSize: 25,
+      fontWeight: "800",
+    },
+
+    profileRole: {
+      color: C.text,
+      fontSize: 19,
+      fontWeight: "800",
+    },
+
+    profileType: {
+      color: C.text,
+      fontSize: 13,
+      marginTop: 4,
+    },
+
+    profileGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
+
+    signOutButton: {
+      alignSelf: "flex-start",
+      height: 43,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 9,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 26,
+    },
+
+    signOutText: {
+      color: C.danger,
+      fontWeight: "800",
+      fontSize: 13,
+    },
+  });
+
+  export { API };

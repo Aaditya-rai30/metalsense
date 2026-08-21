@@ -1,0 +1,68 @@
+{
+  "project": "MetalSense",
+  "context": "Cross-platform Expo mobile app with Expo web preview for heavy-metal pollution intelligence in water quality.",
+  "audiences": [
+    "environmental researchers",
+    "laboratories",
+    "regulators",
+    "industrial compliance teams"
+  ],
+  "primary_tasks": [
+    "authenticate and configure profile",
+    "import CSV/XLSX",
+    "fix blocking validation errors",
+    "trace coordinates and standards",
+    "review deterministic indices",
+    "analyze spatial and temporal pollution",
+    "export evidence-ready reports"
+  ],
+  "tone": "calm, scientific, accountable, government/enterprise quality",
+  "theme": "light only; warm mint environmental base with crisp teal/green function accents",
+  "typography": {
+    "heading_font": "Work Sans",
+    "body_font": "IBM Plex Sans",
+    "numeric_font": "IBM Plex Mono"
+  },
+  "colors": {
+    "background": "#EEFDF8",
+    "surface": "#FDFEFE",
+    "primary": "#1B946A",
+    "teal": "#098396",
+    "cyan": "#78D1DB",
+    "mint": "#DFF7F3",
+    "border": "#D3EFE6",
+    "text": "#37475B",
+    "secondary_text": "#96A3A5"
+  },
+  "components": [
+    "AuthBranch",
+    "ProfileSheet",
+    "EmptyDashboard",
+    "ImportDropzone",
+    "ValidationModal",
+    "DatasetTable",
+    "StandardsTrace",
+    "IndexSummary",
+    "QualityScore",
+    "PollutionStatus",
+    "SpatialMap",
+    "TemporalTrend",
+    "ContributionChart",
+    "DecisionPanel",
+    "ReportExportSheet",
+    "ConfirmDeleteDialog",
+    "Toast via Sonner"
+  ],
+  "first_run": "Left-aligned title, short explanation, large bordered import action, and a quiet provenance note. No fabricated map, KPIs, locations, standards or pollution values.",
+  "import_flow": "Choose CSV/XLSX only -> parse -> blocking validation modal -> user fixes or cancels -> persist only valid/accepted data -> standards selection/WHO fallback trace -> calculate.",
+  "guardrails": [
+    "Persist only user-imported real datasets; first-run state is genuinely empty.",
+    "Accept CSV/XLSX only and reject unsupported files before parsing.",
+    "Block invalid rows/datasets; do not silently coerce missing coordinates, units, standards or values.",
+    "Detect latitude/longitude from actual columns or geolocation service, then reverse geocode actual coordinates; record source, timestamp and confidence.",
+    "Select context-specific standards and visibly fall back to WHO only when no applicable standard is available.",
+    "Calculate HPI, HEI and Cd deterministically with versioned formulas and input traceability.",
+    "Exports must be real CSV/XLSX/PDF files generated from persisted results; never mock download completion.",
+    "AI/ML analysis, if present, must be clearly labeled as secondary and grounded only in validated data."
+  ]
+}

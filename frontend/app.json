@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "MetalSense",
+    "slug": "metalsense",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "metalsense",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.metalsense.app"
+    },
+    "android": {
+      "edgeToEdgeEnabled": true,
+      "package": "com.metalsense.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "extra": {
+      "appTitle": "MetalSense \u2014 Heavy Metal Pollution Intelligence"
+    }
+  }
+}
