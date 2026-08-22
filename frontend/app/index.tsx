@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Dimensions,
   KeyboardAvoidingView,
   Platform,
@@ -21,7 +22,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * T HEME       *
  * ============================================================ */
 
-const C = {
+const LIGHT_C = {
   bg: "#EEFDF8",
   surface: "#FFFFFF",
   sidebar: "#FBFDFC",
@@ -38,7 +39,32 @@ const C = {
   danger: "#C94D4D",
   warning: "#D6A329",
   high: "#DE7A32",
+  white: "#FFFFFF",
 };
+
+const DARK_C = {
+  bg: "#26364A",
+  surface: "#304158",
+  sidebar: "#202B3D",
+  green: "#20D99A",
+  greenDark: "#20D99A",
+  teal: "#00B8C8",
+  cyan: "#72D4D7",
+  mint: "#304158",
+  mint2: "#304158",
+  border: "#40536A",
+  text: "#F5FFFD",
+  muted: "#A9BBC2",
+  muted2: "#A9BBC2",
+  danger: "#FF7B7B",
+  warning: "#F2C75C",
+  high: "#FF9A5C",
+  white: "#F5FFFD",
+};
+
+type ThemeColors = typeof LIGHT_C;
+let C: ThemeColors = LIGHT_C;
+let styles: any;
 
 /* ============================================================
  * A PI CONFIG  *
@@ -724,6 +750,18 @@ const GOOGLE_MAPS_API_KEY =
       setLoading,
     ] = useState(true);
 
+    const [
+      isDark,
+      setIsDark,
+    ] = useState(false);
+
+    const toggleTheme = () => {
+      const next = !isDark;
+      C = next ? DARK_C : LIGHT_C;
+      styles = createStyles();
+      setIsDark(next);
+    };
+
     useEffect(() => {
       let mounted = true;
 
@@ -889,6 +927,12 @@ const GOOGLE_MAPS_API_KEY =
         onSuccess={
           signIn
         }
+        isDark={
+          isDark
+        }
+        toggleTheme={
+          toggleTheme
+        }
         />
       );
     }
@@ -914,6 +958,12 @@ const GOOGLE_MAPS_API_KEY =
       signOut={
         signOut
       }
+      isDark={
+        isDark
+      }
+      toggleTheme={
+        toggleTheme
+      }
       />
     );
   }
@@ -926,6 +976,8 @@ const GOOGLE_MAPS_API_KEY =
     mode,
     setMode,
     onSuccess,
+    isDark,
+    toggleTheme,
   }: {
     mode:
     | "login"
@@ -940,6 +992,9 @@ const GOOGLE_MAPS_API_KEY =
     onSuccess: (
       value: any,
     ) => Promise<void>;
+
+    isDark: boolean;
+    toggleTheme: () => void;
   }) {
     const [
       form,
@@ -1081,19 +1136,10 @@ const GOOGLE_MAPS_API_KEY =
         styles.brand
       }
       >
-      <View
-      style={
-        styles.logo
-      }
-      >
-      <Ionicons
-      name="water"
-      size={24}
-      color={
-        C.surface
-      }
-      />
-      </View>
+      <Image
+      source={require("../metalsense.png")}
+      style={styles.sidebarLogo}
+        />
 
       <Text
       style={
@@ -1112,6 +1158,20 @@ const GOOGLE_MAPS_API_KEY =
       Intelligence
       </Text>
       </View>
+
+      <Pressable
+        onPress={toggleTheme}
+        style={styles.authThemeToggle}
+      >
+        <Ionicons
+          name={isDark ? "sunny-outline" : "moon-outline"}
+          size={17}
+          color={C.teal}
+        />
+        <Text style={styles.authThemeToggleText}>
+          {isDark ? "Light mode" : "Dark mode"}
+        </Text>
+      </Pressable>
 
       <View
       style={
@@ -1389,7 +1449,7 @@ const GOOGLE_MAPS_API_KEY =
               >
               {busy ? (
                 <ActivityIndicator
-                color="#fff"
+                color={C.white}
                 />
               ) : (
                 <>
@@ -1407,7 +1467,7 @@ const GOOGLE_MAPS_API_KEY =
                   <Ionicons
                   name="arrow-forward"
                   size={19}
-                  color="#fff"
+                  color={C.white}
                   />
                   </>
               )}
@@ -1523,6 +1583,8 @@ const GOOGLE_MAPS_API_KEY =
     token,
     refresh,
     signOut,
+    isDark,
+    toggleTheme,
   }: {
     page: Page;
     setPage: (
@@ -1536,6 +1598,8 @@ const GOOGLE_MAPS_API_KEY =
       token?: string,
     ) => Promise<void>;
     signOut: () => Promise<void>;
+    isDark: boolean;
+    toggleTheme: () => void;
   }) {
     const [
       menuOpen,
@@ -1564,30 +1628,23 @@ const GOOGLE_MAPS_API_KEY =
             ]}
             >
             <View
-            style={
-              styles.sidebarBrand
-            }
-            >
-            <View
-            style={
-              styles.sidebarLogo
-            }
-            >
-            <Ionicons
-            name="water"
-            size={21}
-            color="#fff"
-            />
-            </View>
+  style={
+    styles.sidebarBrand
+  }
+>
+  <Image
+    source={require("../metalsense.png")}
+    style={styles.sidebarLogo}
+  />
 
-            <Text
-            style={
-              styles.sidebarBrandText
-            }
-            >
-            MetalSense
-            </Text>
-            </View>
+  <Text
+    style={
+      styles.sidebarBrandText
+    }
+  >
+    MetalSense
+  </Text>
+</View>
 
             <Text
             style={
@@ -1799,6 +1856,24 @@ const GOOGLE_MAPS_API_KEY =
             </Text>
             </View>
             </View>
+
+            <Pressable
+              onPress={toggleTheme}
+              style={styles.themeToggle}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isDark ? "Switch to light mode" : "Switch to dark mode"
+              }
+            >
+              <Ionicons
+                name={isDark ? "sunny-outline" : "moon-outline"}
+                size={18}
+                color={C.teal}
+              />
+              <Text style={styles.themeToggleText}>
+                {isDark ? "Light" : "Dark"}
+              </Text>
+            </Pressable>
 
             <View
             style={
@@ -2109,7 +2184,7 @@ const GOOGLE_MAPS_API_KEY =
       <Ionicons
       name="cloud-upload-outline"
       size={19}
-      color="#fff"
+      color={C.white}
       />
 
       <Text
@@ -3063,8 +3138,8 @@ const GOOGLE_MAPS_API_KEY =
                     {
                       backgroundColor:
                       check.count > 0
-                      ? "#FDEAEA"
-                      : "#E5F7F1",
+                      ? C.mint2
+                      : C.mint2,
                     },
                   ]}
                   >
@@ -3100,8 +3175,8 @@ const GOOGLE_MAPS_API_KEY =
                       {
                         backgroundColor:
                         check.count > 0
-                        ? "#FDEAEA"
-                        : "#E5F7F1",
+                        ? C.mint2
+                        : C.mint2,
                       },
                     ]}
                     >
@@ -6048,13 +6123,7 @@ const GOOGLE_MAPS_API_KEY =
                     style={[
                       styles.decisionIcon,
                       {
-                        backgroundColor:
-                          item.color === C.danger
-                            ? "#FDEAEA"
-                            : item.color ===
-                              C.warning
-                            ? "#FFF5D9"
-                            : "#E5F7F1",
+                        backgroundColor: C.mint2,
                       },
                     ]}
                   >
@@ -6538,13 +6607,13 @@ const GOOGLE_MAPS_API_KEY =
                                 "HIGH" ||
                                 status ===
                                 "CRITICAL"
-                                  ? "#FDEAEA"
+                                  ? C.mint2
                                   : status ===
                                       "LOW" ||
                                     status ===
                                       "SAFE"
-                                  ? "#E5F7F1"
-                                  : "#FFF5D9",
+                                  ? C.mint2
+                                  : C.mint2,
                             },
                           ]}
                         >
@@ -6593,7 +6662,7 @@ const GOOGLE_MAPS_API_KEY =
                 <Ionicons
                   name="download-outline"
                   size={19}
-                  color="#fff"
+                  color={C.white}
                 />
 
                 <Text
@@ -6617,7 +6686,7 @@ const GOOGLE_MAPS_API_KEY =
                 <Ionicons
                   name="document-text-outline"
                   size={19}
-                  color="#fff"
+                  color={C.white}
                 />
 
                 <Text
@@ -6916,8 +6985,8 @@ const GOOGLE_MAPS_API_KEY =
    *   S TYLES      *
    *   ============================================================ */
 
-  const styles =
-  StyleSheet.create({
+  function createStyles() {
+    return StyleSheet.create({
     center: {
       flex: 1,
       alignItems: "center",
@@ -7006,7 +7075,7 @@ const GOOGLE_MAPS_API_KEY =
       width: 52,
       height: 52,
       borderRadius: 14,
-      backgroundColor: "#158DA0",
+      backgroundColor: C.teal,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 12,
@@ -7075,7 +7144,7 @@ const GOOGLE_MAPS_API_KEY =
       borderRadius: 10,
       paddingHorizontal: 14,
       color: C.text,
-      backgroundColor: "#FCFFFE",
+      backgroundColor: C.surface,
       fontSize: 15,
     },
 
@@ -7115,7 +7184,7 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     primaryButtonText: {
-      color: "#fff",
+      color: C.white,
       fontSize: 15,
       fontWeight: "800",
     },
@@ -7135,7 +7204,7 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     sidebar: {
-      width: 250,
+      width: 375,
       backgroundColor: C.sidebar,
       borderRightWidth: 1,
       borderRightColor: C.border,
@@ -7161,15 +7230,11 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     sidebarLogo: {
-      width: 34,
-      height: 34,
-      borderRadius: 9,
-      backgroundColor: "#158DA0",
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: 9,
+    width: 51,
+    height: 51,
+    marginRight: 14,
+    resizeMode: "contain",
     },
-
     sidebarBrandText: {
       color: C.text,
       fontSize: 20,
@@ -7190,23 +7255,23 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     navItem: {
-      minHeight: 45,
-      borderRadius: 9,
-      paddingHorizontal: 10,
+      minHeight: 68,
+      borderRadius: 15,
+      paddingHorizontal: 15,
       flexDirection: "row",
       alignItems: "center",
-      gap: 13,
+      gap: 20,
     },
 
     navItemActive: {
-      backgroundColor: "#DDF5EF",
+      backgroundColor: C.mint,
       borderWidth: 2,
-      borderColor: "#1E2729",
+      borderColor: C.border,
     },
 
     navText: {
       color: C.muted,
-      fontSize: 13.5,
+      fontSize: 20,
       fontWeight: "500",
     },
 
@@ -7235,7 +7300,7 @@ const GOOGLE_MAPS_API_KEY =
       width: 36,
       height: 36,
       borderRadius: 11,
-      backgroundColor: "#DDF5EF",
+      backgroundColor: C.mint,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -7301,7 +7366,7 @@ const GOOGLE_MAPS_API_KEY =
       width: 38,
       height: 38,
       borderRadius: 12,
-      backgroundColor: "#DDF5EF",
+      backgroundColor: C.mint,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -7319,7 +7384,7 @@ const GOOGLE_MAPS_API_KEY =
     contentInner: {
       paddingHorizontal: 30,
       paddingVertical: 29,
-      maxWidth: 1000,
+      maxWidth: 1350,
       width: "100%",
       alignSelf: "center",
     },
@@ -7352,32 +7417,32 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     heroCard: {
-      minHeight: 225,
+      minHeight: 270,
       backgroundColor: C.surface,
       borderWidth: 1,
       borderColor: C.border,
       borderRadius: 18,
-      padding: 27,
+      padding: 32,
       flexDirection: "row",
       alignItems: "center",
-      gap: 25,
+      gap: 30,
       marginBottom: 20,
     },
 
     heroEyebrow: {
       color: C.teal,
-      fontSize: 11,
-      letterSpacing: 2,
+      fontSize: 14,
+      letterSpacing: 2.5,
       fontWeight: "800",
-      marginBottom: 10,
+      marginBottom: 12,
     },
 
     heroTitle: {
       color: C.text,
-      fontSize: 31,
-      lineHeight: 37,
+      fontSize: 40,
+      lineHeight: 48,
       fontWeight: "800",
-      maxWidth: 500,
+      maxWidth: 650,
     },
 
     heroText: {
@@ -7400,7 +7465,7 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     importButtonText: {
-      color: "#fff",
+      color: C.white,
       fontSize: 14,
       fontWeight: "800",
     },
@@ -7413,19 +7478,19 @@ const GOOGLE_MAPS_API_KEY =
 
     statCard: {
       flex: 1,
-      minHeight: 118,
+      minHeight: 150,
       backgroundColor: C.surface,
       borderWidth: 1,
       borderColor: C.border,
       borderRadius: 15,
-      padding: 18,
+      padding: 24,
     },
 
     statValue: {
       color: C.text,
-      fontSize: 27,
+      fontSize: 32,
       fontWeight: "800",
-      marginTop: 9,
+      marginTop: 12,
     },
 
     metricValue: {
@@ -7442,20 +7507,20 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     singleStat: {
-      minHeight: 105,
+      minHeight: 135,
       backgroundColor: C.surface,
       borderWidth: 1,
       borderColor: C.border,
       borderRadius: 15,
-      padding: 18,
+      padding: 24,
       marginBottom: 15,
     },
 
     bigStat: {
       color: C.text,
-      fontSize: 28,
+      fontSize: 32,
       fontWeight: "800",
-      marginTop: 10,
+      marginTop: 12,
     },
 
     panel: {
@@ -7463,7 +7528,7 @@ const GOOGLE_MAPS_API_KEY =
       borderWidth: 1,
       borderColor: C.border,
       borderRadius: 15,
-      padding: 17,
+      padding: 24,
       marginBottom: 15,
     },
 
@@ -7483,7 +7548,7 @@ const GOOGLE_MAPS_API_KEY =
     sampleRow: {
       minHeight: 58,
       borderBottomWidth: 1,
-      borderBottomColor: "#E7F0EE",
+      borderBottomColor: C.border,
       flexDirection: "row",
       alignItems: "center",
       paddingVertical: 10,
@@ -7539,7 +7604,7 @@ const GOOGLE_MAPS_API_KEY =
     checkRow: {
       minHeight: 70,
       borderBottomWidth: 1,
-      borderBottomColor: "#E7F0EE",
+      borderBottomColor: C.border,
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
@@ -7639,7 +7704,7 @@ const GOOGLE_MAPS_API_KEY =
       flexDirection: "row",
       justifyContent: "space-between",
       borderBottomWidth: 1,
-      borderBottomColor: "#E7F0EE",
+      borderBottomColor: C.border,
       paddingVertical: 7,
     },
 
@@ -7710,12 +7775,12 @@ const GOOGLE_MAPS_API_KEY =
       flexDirection: "row",
       alignItems: "center",
       borderBottomWidth: 1,
-      borderBottomColor: "#E7F0EE",
+      borderBottomColor: C.border,
       paddingVertical: 8,
     },
 
     resultTableHeader: {
-      backgroundColor: "#EEF8F5",
+      backgroundColor: C.mint2,
       borderRadius: 8,
     },
 
@@ -7753,7 +7818,7 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     qualityHero: {
-      backgroundColor: "#DDF7F1",
+      backgroundColor: C.mint,
       borderRadius: 15,
       padding: 25,
       marginBottom: 20,
@@ -7800,8 +7865,8 @@ const GOOGLE_MAPS_API_KEY =
       padding: 13,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: "#F1D99B",
-      backgroundColor: "#FFF9E8",
+      borderColor: C.warning,
+      backgroundColor: C.mint2,
     },
 
     importLockedIcon: {
@@ -7810,7 +7875,7 @@ const GOOGLE_MAPS_API_KEY =
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#FFF0C7",
+      backgroundColor: C.mint,
     },
 
     importLockedTitle: {
@@ -7834,8 +7899,8 @@ const GOOGLE_MAPS_API_KEY =
       padding: 12,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: "#BFE7D6",
-      backgroundColor: "#EAF9F3",
+      borderColor: C.border,
+      backgroundColor: C.mint2,
     },
 
     importReadyIcon: {
@@ -7844,7 +7909,7 @@ const GOOGLE_MAPS_API_KEY =
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#D9F3E8",
+      backgroundColor: C.mint2,
     },
 
     importReadyText: {
@@ -7856,8 +7921,8 @@ const GOOGLE_MAPS_API_KEY =
 
     importChoiceDisabled: {
       opacity: 0.55,
-      backgroundColor: "#F4F7F6",
-      borderColor: "#D9E3E0",
+      backgroundColor: C.surface,
+      borderColor: C.border,
     },
 
     importChoiceIcon: {
@@ -7869,20 +7934,20 @@ const GOOGLE_MAPS_API_KEY =
     },
 
     importChoiceIconDisabled: {
-      backgroundColor: "#E9EEEC",
+      backgroundColor: C.surface,
     },
 
     importChoiceTitleDisabled: {
-      color: "#879692",
+      color: C.muted,
     },
 
     importChoiceSubtitleDisabled: {
-      color: "#A2AFAC",
+      color: C.muted2,
     },
 
     importChoiceLockedText: {
       marginTop: 14,
-      color: "#8A9693",
+      color: C.muted,
       fontSize: 12,
       fontWeight: "700",
     },
@@ -7899,7 +7964,7 @@ const GOOGLE_MAPS_API_KEY =
       backgroundColor: C.surface,
       borderWidth: 1,
       borderStyle: "dashed",
-      borderColor: "#B9DED5",
+      borderColor: C.border,
       borderRadius: 15,
       padding: 22,
       justifyContent: "center",
@@ -8053,7 +8118,7 @@ const GOOGLE_MAPS_API_KEY =
 
     reportDatasetOptionActive: {
       borderColor: C.green,
-      backgroundColor: "#ECFAF5",
+      backgroundColor: C.mint2,
     },
 
     reportDatasetIcon: {
@@ -8062,7 +8127,7 @@ const GOOGLE_MAPS_API_KEY =
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#EAF8F4",
+      backgroundColor: C.mint2,
     },
 
     reportDatasetName: {
@@ -8109,7 +8174,7 @@ const GOOGLE_MAPS_API_KEY =
       paddingHorizontal: 10,
       paddingVertical: 7,
       borderRadius: 999,
-      backgroundColor: "#EAF8F4",
+      backgroundColor: C.mint2,
     },
 
     reportStatusPillText: {
@@ -8123,7 +8188,7 @@ const GOOGLE_MAPS_API_KEY =
       marginTop: 12,
       borderRadius: 12,
       padding: 14,
-      backgroundColor: "#ECFAF5",
+      backgroundColor: C.mint2,
       borderWidth: 1,
       borderColor: C.border,
     },
@@ -8167,7 +8232,7 @@ const GOOGLE_MAPS_API_KEY =
       flex: 1,
       height: 12,
       borderRadius: 999,
-      backgroundColor: "#E9F2EF",
+      backgroundColor: C.mint2,
       overflow: "hidden",
     },
 
@@ -8279,7 +8344,7 @@ const GOOGLE_MAPS_API_KEY =
       width: 65,
       height: 65,
       borderRadius: 17,
-      backgroundColor: "#DDF7F1",
+      backgroundColor: C.mint,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -8326,6 +8391,50 @@ const GOOGLE_MAPS_API_KEY =
       fontWeight: "800",
       fontSize: 13,
     },
+
+    authThemeToggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "center",
+      gap: 7,
+      paddingHorizontal: 13,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+      marginBottom: 14,
+    },
+
+    authThemeToggleText: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+
+    themeToggle: {
+      height: 38,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      marginLeft: "auto",
+      marginRight: 12,
+    },
+
+    themeToggleText: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "800",
+    },
   });
+  }
+
+  styles = createStyles();
 
   export { API };
