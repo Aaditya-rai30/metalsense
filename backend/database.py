@@ -8,5 +8,12 @@ client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
 
+async def ensure_indexes():
+    await db.sessions.create_index(
+        "expires_at",
+        expireAfterSeconds=0,
+    )
+
+
 async def close_database():
     client.close()

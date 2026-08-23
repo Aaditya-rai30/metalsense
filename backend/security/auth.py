@@ -4,7 +4,17 @@ from fastapi import Header, HTTPException
 
 from services.auth_service import get_current_user
 
-
+from fastapi import (
+    APIRouter,
+    Header,
+    Request,
+)
+from services.auth_service import (
+    authenticate_user,
+    create_user,
+    get_current_user,
+    logout,
+)
 async def require_current_user(
     authorization: str | None = Header(default=None),
 ) -> dict:

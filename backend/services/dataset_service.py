@@ -9,10 +9,20 @@ from pathlib import Path
 import pandas as pd
 import requests
 from fastapi import HTTPException, UploadFile
+from security.upload import (
+    validate_filename,
+    validate_extension,
+    read_upload_safely,
+    validate_file_content,
+    validate_dataframe_dimensions,
+    validate_dataframe_security,
+)
 
 from database import db
 from engine.data_quality_engine import DataQualityEngine
 from engine.pollution_engine import METALS, calculate_indices
+from engine.temporal_engine import fill_missing_dates_from_season
+from engine.pipeline import MetalSenseMLEngine
 from services.standards_service import (
     get_standards,
     standard_metadata,
@@ -20,6 +30,8 @@ from services.standards_service import (
 
 
 logger = logging.getLogger(__name__)
+
+_ml_engine = MetalSenseMLEngine()
 
 
 # ============================================================
@@ -65,6 +77,11 @@ ALIASES = {
         "authority",
         "standard_authority",
         "standard authority",
+    ],
+    "season": [
+        "season",
+        "sampling season",
+        "sample season",
     ],
 }
 
@@ -810,37 +827,62 @@ def parse_metalsense_export(
 async def parse_upload(
     file: UploadFile,
 ):
-    filename = (
+    """
+    Securely parse an uploaded CSV/XLS/XLSX dataset.
+
+    Security sequence:
+
+        filename validation
+              ↓
+        extension allowlist
+              ↓
+        bounded file read
+              ↓
+        basic file signature/content validation
+              ↓
+        Pandas parsing
+              ↓
+        dataframe dimension validation
+              ↓
+        normal MetalSense processing
+    """
+
+    # --------------------------------------------------------
+    # 1. Filename
+    # --------------------------------------------------------
+
+    filename = validate_filename(
         file.filename
-        or "dataset"
     )
 
-    suffix = Path(
+    # --------------------------------------------------------
+    # 2. Extension
+    # --------------------------------------------------------
+
+    suffix = validate_extension(
         filename
-    ).suffix.lower()
+    )
 
-    if suffix not in {
-        ".csv",
-        ".xlsx",
-        ".xls",
-    }:
+    # --------------------------------------------------------
+    # 3. Secure bounded read
+    # --------------------------------------------------------
 
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Only CSV, XLSX, and XLS "
-                "files are supported."
-            ),
-        )
+    raw = await read_upload_safely(
+        file
+    )
 
-    raw = await file.read()
+    # --------------------------------------------------------
+    # 4. Basic content/signature validation
+    # --------------------------------------------------------
 
-    if not raw:
+    validate_file_content(
+        raw=raw,
+        suffix=suffix,
+    )
 
-        raise HTTPException(
-            status_code=400,
-            detail="The uploaded file is empty.",
-        )
+    # --------------------------------------------------------
+    # 5. Parse with Pandas
+    # --------------------------------------------------------
 
     try:
 
@@ -858,12 +900,23 @@ async def parse_upload(
 
     except Exception as exc:
 
+        logger.warning(
+            "Rejected malformed dataset %s: %s",
+            filename,
+            exc,
+        )
+
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Could not parse file: {exc}"
+                "Could not parse the uploaded file. "
+                "Please provide a valid CSV, XLSX, or XLS dataset."
             ),
         )
+
+    # --------------------------------------------------------
+    # 6. Empty dataset
+    # --------------------------------------------------------
 
     if df.empty:
 
@@ -872,13 +925,21 @@ async def parse_upload(
             detail="The file contains no records.",
         )
 
+    # --------------------------------------------------------
+    # 7. Dataset dimensions
+    # --------------------------------------------------------
+
+    validate_dataframe_dimensions(
+        row_count=len(df),
+        column_count=len(df.columns),
+    )
+
     return (
         filename,
         suffix,
         raw,
         df,
     )
-
 
 # ============================================================
 # REVERSE GEOCODING
@@ -980,6 +1041,7 @@ def build_quality_dataframe(
     country_col,
     water_type_col,
     unit_col,
+    season_col,
     metal_columns,
 ):
     rows = []
@@ -1021,6 +1083,30 @@ def build_quality_dataframe(
             date = source_row[
                 date_col
             ]
+
+        season = None
+
+        if (
+            season_col
+            and pd.notna(
+                source_row.get(
+                    season_col
+                )
+            )
+        ):
+
+            season = str(
+                source_row.get(
+                    season_col
+                )
+            ).strip() or None
+
+        date_inferred = bool(
+            source_row.get(
+                "date_inferred",
+                False,
+            )
+        )
 
         latitude = source_row[
             lat_col
@@ -1111,6 +1197,12 @@ def build_quality_dataframe(
                     "date":
                         date,
 
+                    "season":
+                        season,
+
+                    "date_inferred":
+                        date_inferred,
+
                     "latitude":
                         latitude,
 
@@ -1187,6 +1279,25 @@ async def import_raw_dataset(
         ALIASES["date"],
     )
 
+    season_col = find_column(
+        columns,
+        ALIASES["season"],
+    )
+
+    # Infer representative dates from season only when the actual date is
+    # missing/unparseable. Existing valid dates are never overwritten.
+    df = fill_missing_dates_from_season(df)
+    columns = normalized_columns(df)
+
+    date_col = find_column(
+        columns,
+        ALIASES["date"],
+    )
+    season_col = find_column(
+        columns,
+        ALIASES["season"],
+    )
+
     country_col = find_column(
         columns,
         ALIASES["country"],
@@ -1223,6 +1334,19 @@ async def import_raw_dataset(
         )
 
     # --------------------------------------------------------
+    # SECURITY VALIDATION
+    # --------------------------------------------------------
+
+    validate_dataframe_security(
+        df=df,
+        latitude_column=lat_col,
+        longitude_column=lon_col,
+        metal_columns=list(
+            metal_columns.values()
+        ),
+    )
+
+    # --------------------------------------------------------
     # DATA QUALITY
     # --------------------------------------------------------
 
@@ -1236,6 +1360,7 @@ async def import_raw_dataset(
             country_col=country_col,
             water_type_col=water_type_col,
             unit_col=unit_col,
+            season_col=season_col,
             metal_columns=metal_columns,
         )
     )
@@ -1587,6 +1712,12 @@ async def import_raw_dataset(
 
             sample_date = None
 
+        season = None
+        if season_col and pd.notna(source_row.get(season_col)):
+            season = str(source_row.get(season_col)).strip() or None
+
+        date_inferred = bool(source_row.get("date_inferred", False))
+
         # ----------------------------------------------------
         # WATER TYPE
         # ----------------------------------------------------
@@ -1667,6 +1798,12 @@ async def import_raw_dataset(
 
                 "date":
                     sample_date,
+
+                "season":
+                    season,
+
+                "date_inferred":
+                    date_inferred,
 
                 "latitude":
                     latitude,
@@ -1759,9 +1896,27 @@ async def import_raw_dataset(
         )
     )
 
+    dataset_id = str(uuid.uuid4())
+    dataset_stub = {
+        "dataset_id": dataset_id,
+        "filename": filename,
+        **import_metadata,
+    }
+    try:
+        ml_enrichment = _ml_engine.enrich_records(
+            records,
+            dataset_stub,
+        )
+    except Exception as exc:
+        logger.exception("Final ML enrichment failed")
+        raise HTTPException(
+            status_code=500,
+            detail="ML analysis pipeline failed.",
+        ) from exc
+
     dataset = {
         "dataset_id":
-            str(uuid.uuid4()),
+            dataset_id,
 
         "user_id":
             user["user_id"],
@@ -1803,6 +1958,17 @@ async def import_raw_dataset(
                 str(column)
                 for column in df.columns
             ],
+
+        "ml": {
+            "anomaly_scores": ml_enrichment.get("anomaly_scores", {}),
+            "explanations": ml_enrichment.get("explanations", []),
+            "report": ml_enrichment.get("report", {}),
+            "spatial": ml_enrichment.get("spatial", {}),
+            "spatial_summary": ml_enrichment.get("spatial_summary", {}),
+            "hotspots": ml_enrichment.get("hotspots", {}),
+            "temporal": ml_enrichment.get("temporal", {}),
+            "rag_sources": ml_enrichment.get("rag_sources", []),
+        },
 
         "quality": {
             "score":
