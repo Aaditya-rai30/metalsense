@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, Header, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
+
+from security.auth import require_current_user
 
 from services.dataset_service import (
     import_dataset,
@@ -9,120 +18,11 @@ from services.dataset_service import (
     clear_datasets,
 )
 
+
 router = APIRouter(
     prefix="/datasets",
     tags=["Datasets"],
 )
-
-
-# ============================================================
-# AUTH HELPER
-# ============================================================
-
-async def get_authenticated_user(
-    authorization: str | None,
-) -> dict:
-    """
-    Resolve the logged-in user from the Bearer token.
-
-    This uses the same /api/auth/me endpoint contract already
-    used by the frontend: Authorization: Bearer <token>.
-    """
-
-    if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Authorization header is required.",
-        )
-
-    if not authorization.lower().startswith("bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail="Authorization must use Bearer token.",
-        )
-
-    token = authorization[7:].strip()
-
-    if not token:
-        raise HTTPException(
-            status_code=401,
-            detail="Bearer token is missing.",
-        )
-
-    # --------------------------------------------------------
-    # Import the existing authentication implementation.
-    #
-    # Your project already handles token authentication in the
-    # auth routes/service. Keep that implementation centralized.
-    # --------------------------------------------------------
-
-    try:
-        from routes.auth_routes import get_user_from_token
-    except ImportError:
-        get_user_from_token = None
-
-    if get_user_from_token is not None:
-        user = await get_user_from_token(token)
-
-        if not user:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid or expired token.",
-            )
-
-        return user
-
-    # --------------------------------------------------------
-    # Fallback for the current prototype if auth_routes does not
-    # expose get_user_from_token().
-    #
-    # This keeps compatibility with the token/session structure
-    # used by the current backend.
-    # --------------------------------------------------------
-
-    try:
-        from database import db
-
-        session = await db.sessions.find_one(
-            {"token": token}
-        )
-
-        if not session:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid or expired token.",
-            )
-
-        user_id = session.get("user_id")
-
-        if not user_id:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid authentication session.",
-            )
-
-        user = await db.users.find_one(
-            {"user_id": user_id}
-        )
-
-        if not user:
-            raise HTTPException(
-                status_code=401,
-                detail="User not found.",
-            )
-
-        user.pop("_id", None)
-
-        return user
-
-    except HTTPException:
-        raise
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Authentication lookup failed: {exc}",
-        )
 
 
 # ============================================================
@@ -142,37 +42,23 @@ async def upload_dataset(
     analytical_method: str = Form(...),
     detection_limit: str = Form(...),
 
-    authorization: str | None = Header(
-        default=None
-    ),
+    user: dict = Depends(require_current_user),
 ):
     """
     Upload CSV/XLS/XLSX dataset.
 
-    Import metadata is mandatory and must be supplied together
-    with the uploaded file.
+    Authentication is required.
+
+    Import metadata is mandatory and must be supplied
+    together with the uploaded file.
     """
-
-    # --------------------------------------------------------
-    # Authenticate
-    # --------------------------------------------------------
-
-    user = await get_authenticated_user(
-        authorization
-    )
-
-    # --------------------------------------------------------
-    # Validate metadata
-    #
-    # FastAPI's Form(...) already makes each field required,
-    # but we also reject whitespace-only values.
-    # --------------------------------------------------------
 
     metadata = {
         "data_source": data_source.strip(),
         "laboratory_organization":
             laboratory_organization.strip(),
-        "report_id": report_id.strip(),
+        "report_id":
+            report_id.strip(),
         "analytical_method":
             analytical_method.strip(),
         "detection_limit":
@@ -195,10 +81,6 @@ async def upload_dataset(
             },
         )
 
-    # --------------------------------------------------------
-    # Import dataset
-    # --------------------------------------------------------
-
     return await import_dataset(
         file=file,
         user=user,
@@ -215,13 +97,11 @@ async def upload_dataset(
     summary="Get Datasets",
 )
 async def get_datasets(
-    authorization: str | None = Header(
-        default=None
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    user = await get_authenticated_user(
-        authorization
-    )
+    """
+    Return only datasets belonging to the authenticated user.
+    """
 
     return await list_datasets(
         user
@@ -237,13 +117,11 @@ async def get_datasets(
     summary="Remove All Datasets",
 )
 async def remove_all_datasets(
-    authorization: str | None = Header(
-        default=None
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    user = await get_authenticated_user(
-        authorization
-    )
+    """
+    Delete all datasets belonging to the authenticated user.
+    """
 
     return await clear_datasets(
         user
@@ -260,13 +138,13 @@ async def remove_all_datasets(
 )
 async def remove_dataset(
     dataset_id: str,
-    authorization: str | None = Header(
-        default=None
-    ),
+
+    user: dict = Depends(require_current_user),
 ):
-    user = await get_authenticated_user(
-        authorization
-    )
+    """
+    Delete a dataset only if it belongs to the
+    authenticated user.
+    """
 
     return await delete_dataset(
         dataset_id,

@@ -1,6 +1,9 @@
-from fastapi import APIRouter, Header
+from __future__ import annotations
 
-from services.auth_service import get_current_user
+from fastapi import APIRouter, Depends
+
+from security.auth import require_current_user
+
 from services.analysis_service import (
     get_analysis,
     get_summary,
@@ -14,52 +17,44 @@ router = APIRouter(
 )
 
 
-async def require_user(
-    authorization: str | None,
-):
-    return await get_current_user(
-        authorization
-    )
-
-
 # ============================================================
 # FULL ANALYSIS
 # ============================================================
 
 @router.get(
-    "/{dataset_id}"
+    "/{dataset_id}",
+    summary="Get Full Dataset Analysis",
 )
 async def analysis(
     dataset_id: str,
-    authorization: str | None = Header(
-        default=None
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    user = await require_user(
-        authorization
-    )
+    """
+    Return the complete analysis for a dataset.
+
+    The authenticated user's ID is passed to every
+    service operation so dataset ownership can be enforced.
+    """
+
+    user_id = user["user_id"]
 
     return {
-        "dataset_id":
+        "dataset_id": dataset_id,
+
+        "summary": await get_summary(
             dataset_id,
+            user_id,
+        ),
 
-        "summary":
-            await get_summary(
-                dataset_id,
-                user["user_id"],
-            ),
+        "metals": await get_metal_analysis(
+            dataset_id,
+            user_id,
+        ),
 
-        "metals":
-            await get_metal_analysis(
-                dataset_id,
-                user["user_id"],
-            ),
-
-        "spatial":
-            await get_spatial_data(
-                dataset_id,
-                user["user_id"],
-            ),
+        "spatial": await get_spatial_data(
+            dataset_id,
+            user_id,
+        ),
     }
 
 
@@ -68,18 +63,13 @@ async def analysis(
 # ============================================================
 
 @router.get(
-    "/{dataset_id}/summary"
+    "/{dataset_id}/summary",
+    summary="Get Analysis Summary",
 )
 async def summary(
     dataset_id: str,
-    authorization: str | None = Header(
-        default=None
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    user = await require_user(
-        authorization
-    )
-
     return await get_summary(
         dataset_id,
         user["user_id"],
@@ -91,18 +81,13 @@ async def summary(
 # ============================================================
 
 @router.get(
-    "/{dataset_id}/metals"
+    "/{dataset_id}/metals",
+    summary="Get Metal Analysis",
 )
 async def metals(
     dataset_id: str,
-    authorization: str | None = Header(
-        default=None
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    user = await require_user(
-        authorization
-    )
-
     return await get_metal_analysis(
         dataset_id,
         user["user_id"],
@@ -114,18 +99,13 @@ async def metals(
 # ============================================================
 
 @router.get(
-    "/{dataset_id}/spatial"
+    "/{dataset_id}/spatial",
+    summary="Get Spatial Analysis",
 )
 async def spatial(
     dataset_id: str,
-    authorization: str | None = Header(
-        default=None
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    user = await require_user(
-        authorization
-    )
-
     return await get_spatial_data(
         dataset_id,
         user["user_id"],
