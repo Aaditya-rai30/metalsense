@@ -2071,6 +2071,9 @@ function AppShell({
                 user={
                   user
                 }
+                token={
+                  token
+                }
               />
             )}
 
@@ -5721,10 +5724,12 @@ function ReportsScreen({
   dataset,
   datasets,
   user,
+  token,
 }: {
   dataset?: Dataset;
   datasets: Dataset[];
   user: User;
+  token: string;
 }) {
   const [selectedDatasetId, setSelectedDatasetId] =
     useState<string>(dataset?.dataset_id || "");
@@ -5962,7 +5967,7 @@ function ReportsScreen({
     },
   ];
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     if (!selectedDataset) {
       Alert.alert(
         "Nothing to export",
@@ -5971,174 +5976,48 @@ function ReportsScreen({
       return;
     }
 
-    const columns =
-      selectedDataset.columns ||
-      Object.keys(
-        selectedDataset.records?.[0] || {},
+    if (Platform.OS !== "web") {
+      Alert.alert(
+        "CSV export",
+        "CSV export is available in the web preview.",
       );
+      return;
+    }
 
-    const reportColumns = [
-      ...columns,
-      "analysis_status",
-      "analysis_hpi",
-      "analysis_hei",
-      "analysis_cd",
-    ];
-
-    const lines: any[][] = [
-      [
-        "MetalSense report",
-        "",
-        "",
-      ],
-      [
-        "Dataset",
-        selectedDataset.filename,
-        "",
-      ],
-      [
-        "User",
-        user.full_name,
-        "",
-      ],
-      [
-        "Role",
-        user.role,
-        "",
-      ],
-      [
-        "Organization",
-        user.organization || "",
-        "",
-      ],
-      [
-        "Data Source",
-        selectedDataset.data_source || "",
-        "",
-      ],
-      [
-        "Laboratory / Organization",
-        selectedDataset.laboratory_organization || "",
-        "",
-      ],
-      [
-        "Report ID",
-        selectedDataset.report_id || "",
-        "",
-      ],
-      [
-        "Analytical Method",
-        selectedDataset.analytical_method || "",
-        "",
-      ],
-      [
-        "Detection Limit",
-        selectedDataset.detection_limit || "",
-        "",
-      ],
-      [],
-      reportColumns,
-    ];
-
-    (selectedDataset.records || []).forEach(
-      (row) => {
-        const analysis = row.analysis || {};
-
-        lines.push(
-          reportColumns.map(
-            (column) => {
-              if (
-                column ===
-                "analysis_status"
-              ) {
-                return (
-                  analysis.status || ""
-                );
-              }
-
-              if (
-                column ===
-                "analysis_hpi"
-              ) {
-                return (
-                  analysis.hpi ?? ""
-                );
-              }
-
-              if (
-                column ===
-                "analysis_hei"
-              ) {
-                return (
-                  analysis.hei ?? ""
-                );
-              }
-
-              if (
-                column ===
-                "analysis_cd"
-              ) {
-                return (
-                  analysis.cd ?? ""
-                );
-              }
-
-              return String(
-                row[column] ?? "",
-              );
-            },
-          ),
-        );
-      },
-    );
-
-    const csv = lines
-      .map(
-        (line: any[]) =>
-          line
-            .map(
-              (value) =>
-                `"${String(
-                  value ?? "",
-                ).replace(
-                  /"/g,
-                  '""',
-                )}"`,
-            )
-            .join(","),
-      )
-      .join("\n");
-
-    if (Platform.OS === "web") {
-      const blob = new Blob(
-        [csv],
+    try {
+      const response = await fetch(
+        `${API}/datasets/${encodeURIComponent(
+          selectedDataset.dataset_id,
+        )}/export`,
         {
-          type:
-            "text/csv;charset=utf-8",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
       );
 
-      const url =
-        URL.createObjectURL(blob);
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(
+          message || "The dataset export failed.",
+        );
+      }
 
-      const anchor =
-        document.createElement("a");
-
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
       anchor.href = url;
-
       anchor.download =
         `${selectedDataset.filename.replace(
           /\.[^.]+$/,
           "",
         )}_metalsense_report.csv`;
-
       anchor.click();
-
       URL.revokeObjectURL(url);
-    } else {
+    } catch (error: any) {
       Alert.alert(
-        "CSV ready",
-        "CSV export is available in the web preview.",
+        "Export failed",
+        error?.message || "The dataset export failed.",
       );
     }
   };
@@ -11484,5 +11363,3 @@ function createStyles() {
 styles = createStyles();
 
 export { API };
-
-

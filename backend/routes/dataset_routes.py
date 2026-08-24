@@ -11,6 +11,7 @@ from fastapi import (
     Request,
     UploadFile,
 )
+from fastapi.responses import Response
 
 from security.auth import require_current_user
 from security.rate_limit import rate_limit_api
@@ -18,6 +19,7 @@ from security.rate_limit import rate_limit_api
 from services.dataset_service import (
     import_dataset,
     list_datasets,
+    export_dataset,
     delete_dataset,
     clear_datasets,
 )
@@ -103,6 +105,27 @@ async def get_datasets(
     user: dict = Depends(require_current_user),
 ):
     return await list_datasets(user)
+
+
+@router.get("/{dataset_id}/export")
+async def download_dataset(
+    dataset_id: str,
+    user: dict = Depends(require_current_user),
+):
+    csv_content = await export_dataset(
+        dataset_id,
+        user,
+    )
+
+    return Response(
+        content=csv_content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="metalsense-{dataset_id}.csv"'
+            ),
+        },
+    )
 
 
 @router.delete("")
