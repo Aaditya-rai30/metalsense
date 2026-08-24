@@ -1761,10 +1761,14 @@ async def import_raw_dataset(
                 },
     )
 
+    except HTTPException:
+        raise
+
     except Exception as exc:
 
         logger.exception(
-            "Data quality engine failed"
+            "Data quality engine failed: %s",
+            exc,
         )
 
         raise HTTPException(
@@ -2262,14 +2266,24 @@ async def import_raw_dataset(
     if not records:
 
         logger.error(
-            "Import failed: zero valid records generated"
+            "Import failed: zero valid records generated. rows=%s errors=%s metals=%s",
+            len(df),
+            errors[:10],
+            list(metal_columns.keys()),
         )
 
         raise HTTPException(
             status_code=422,
             detail={
+                "code": "ZERO_VALID_RECORDS",
                 "message":
-                    "Dataset validation failed. Please correct the file and upload again.",
+                    "Dataset validation failed. No valid records could be generated.",
+
+                "debug": {
+                    "rows_received": len(df),
+                    "columns": [str(c) for c in df.columns],
+                    "metals_detected": list(metal_columns.keys()),
+                },
 
                 "errors":
                     errors,
