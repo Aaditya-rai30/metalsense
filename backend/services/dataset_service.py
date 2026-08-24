@@ -26,6 +26,14 @@ from engine.pollution_engine import METALS, calculate_indices
 from engine.temporal_engine import fill_missing_dates_from_season
 from services.pdf_service import parse_pdf
 from engine.pipeline import MetalSenseMLEngine
+from schemas.dataset_schema import (
+    build_dataset_export_csv,
+    is_frontend_report_export,
+    is_schema_export,
+    parse_frontend_report_export,
+    parse_schema_export,
+    validate_dataset_document,
+)
 from services.standards_service import (
     get_standards,
     standard_metadata,
@@ -927,6 +935,20 @@ async def parse_upload(
                 parsed_pdf.get("table_count"),
                 len(df),
                 len(df.columns),
+            )
+
+        elif suffix == ".csv" and (
+            is_schema_export(raw)
+            or is_frontend_report_export(raw)
+            or is_metalsense_export_raw(raw)
+        ):
+
+            # Versioned and legacy MetalSense exports have their own
+            # parsers. A non-empty placeholder allows the shared upload
+            # validation to complete without asking Pandas to interpret
+            # formats that contain metadata before the tabular rows.
+            df = pd.DataFrame(
+                [{"metalsense_export": True}]
             )
 
         elif suffix == ".csv":
@@ -2342,6 +2364,10 @@ async def import_raw_dataset(
         },
     }
 
+    dataset = validate_dataset_document(
+        dataset
+    )
+
     try:
         await db.datasets.insert_one(
             dataset
@@ -2369,6 +2395,52 @@ async def import_raw_dataset(
 # MAIN IMPORT
 # ============================================================
 
+async def persist_exported_dataset(
+    *,
+    exported: dict,
+    filename: str,
+    suffix: str,
+    user: dict,
+    import_metadata: dict,
+):
+    dataset = {
+        "dataset_id": str(uuid.uuid4()),
+        "user_id": user["user_id"],
+        "filename": filename,
+        "file_type": suffix[1:].upper(),
+        "data_source": import_metadata["data_source"],
+        "laboratory_organization": import_metadata[
+            "laboratory_organization"
+        ],
+        "report_id": import_metadata["report_id"],
+        "analytical_method": import_metadata["analytical_method"],
+        "detection_limit": import_metadata["detection_limit"],
+        "source_type": "metalsense_export",
+        "source_application": exported.get(
+            "source_application",
+            "MetalSense",
+        ),
+        "source_dataset": exported.get("source_dataset"),
+        "source_export_date": exported.get("source_export_date"),
+        "source_schema_version": exported.get("source_schema_version", "legacy"),
+        "imported_at": pd.Timestamp.now(tz="UTC").isoformat(),
+        "records": exported["records"],
+        "columns": exported["columns"],
+        "quality": exported.get("quality")
+        or calculate_export_quality(exported["records"]),
+    }
+
+    dataset = validate_dataset_document(
+        dataset
+    )
+
+    await db.datasets.insert_one(
+        dataset
+    )
+
+    dataset.pop("_id", None)
+    return dataset
+
 async def import_dataset(
     file: UploadFile,
     user: dict,
@@ -2383,106 +2455,36 @@ async def import_dataset(
         file
     )
 
-    # ========================================================
-    # METALSENSE EXPORT
-    # ========================================================
+    if suffix == ".csv":
+        try:
+            if is_schema_export(raw):
+                logger.info("Detected MetalSense schema export: %s", filename)
+                exported = parse_schema_export(raw)
+            elif is_frontend_report_export(raw):
+                logger.info("Detected legacy frontend report: %s", filename)
+                exported = parse_frontend_report_export(raw)
+            elif is_metalsense_export_raw(raw):
+                logger.info("Detected legacy MetalSense export: %s", filename)
+                exported = parse_metalsense_export(
+                    raw=raw,
+                    filename=filename,
+                )
+            else:
+                exported = None
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=str(exc),
+            ) from exc
 
-    if (
-        suffix == ".csv"
-        and is_metalsense_export_raw(
-            raw
-        )
-    ):
-
-        logger.info(
-            "Detected MetalSense export: %s",
-            filename,
-        )
-
-        exported = (
-            parse_metalsense_export(
-                raw=raw,
+        if exported is not None:
+            return await persist_exported_dataset(
+                exported=exported,
                 filename=filename,
+                suffix=suffix,
+                user=user,
+                import_metadata=import_metadata,
             )
-        )
-
-        dataset = {
-            "dataset_id":
-                str(uuid.uuid4()),
-
-            "user_id":
-                user["user_id"],
-
-            "filename":
-                filename,
-
-            "file_type":
-                suffix[1:].upper(),
-
-            "data_source":
-                import_metadata["data_source"],
-
-            "laboratory_organization":
-                import_metadata["laboratory_organization"],
-
-            "report_id":
-                import_metadata["report_id"],
-
-            "analytical_method":
-                import_metadata["analytical_method"],
-
-            "detection_limit":
-                import_metadata["detection_limit"],
-
-            "source_type":
-                "metalsense_export",
-
-            "source_application":
-                exported[
-                    "source_application"
-                ],
-
-            "source_dataset":
-                exported[
-                    "source_dataset"
-                ],
-
-            "source_export_date":
-                exported[
-                    "source_export_date"
-                ],
-
-            "imported_at":
-                pd.Timestamp.now(
-                    tz="UTC"
-                ).isoformat(),
-
-            "records":
-                exported[
-                    "records"
-                ],
-
-            "columns":
-                exported[
-                    "columns"
-                ],
-
-            "quality":
-                exported[
-                    "quality"
-                ],
-        }
-
-        await db.datasets.insert_one(
-            dataset
-        )
-
-        dataset.pop(
-            "_id",
-            None,
-        )
-
-        return dataset
 
     # ========================================================
     # NORMAL RAW DATASET
@@ -2516,6 +2518,27 @@ async def list_datasets(
         "imported_at",
         -1,
     ).to_list(50)
+
+
+async def export_dataset(
+    dataset_id: str,
+    user: dict,
+):
+    dataset = await db.datasets.find_one(
+        {
+            "dataset_id": dataset_id,
+            "user_id": user["user_id"],
+        },
+        {"_id": 0},
+    )
+
+    if dataset is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Dataset not found",
+        )
+
+    return build_dataset_export_csv(dataset)
 
 
 async def delete_dataset(
