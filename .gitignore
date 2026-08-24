@@ -1,3 +1,11 @@
 .env
 .env.*
 !.env.example
+
+# Installed frontend dependencies and Expo's local state
+node_modules/
+.expo/
+
+# Generated Python bytecode
+__pycache__/
+*.py[cod]
