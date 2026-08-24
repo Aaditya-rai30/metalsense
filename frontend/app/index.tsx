@@ -3085,7 +3085,6 @@ function ImportScreen({
       }
 
       setBusy(true);
-      setPdfReviewOpen(false);
 
       try {
         const formData = new FormData();
@@ -3172,9 +3171,13 @@ function ImportScreen({
 
         await refresh(token);
 
+        setPdfReviewOpen(false);
         setLocationReviews([]);
         setLocationOverrides({});
         setPendingImportAsset(null);
+        setActiveLocationIndex(0);
+        setLocationLat("");
+        setLocationLng("");
 
         Alert.alert(
           "Import successful",
@@ -3196,8 +3199,7 @@ function ImportScreen({
 
         if (
           error instanceof ApiError &&
-          error.status === 422 &&
-          error.body?.detail?.code === "MISSING_REQUIREMENTS"
+          error.status === 422
         ) {
           const requirements =
             error.body.detail.requirements || [];
@@ -3223,8 +3225,13 @@ function ImportScreen({
 
         Alert.alert(
           "Import failed",
-          error?.message ||
-          "The dataset could not be imported after coordinate confirmation.",
+          JSON.stringify(
+            error?.body?.detail ||
+            error?.message ||
+            "Unknown import error",
+            null,
+            2,
+          ),
         );
       } finally {
         setBusy(false);
@@ -3432,8 +3439,13 @@ function ImportScreen({
 
       Alert.alert(
         "Import failed",
-        error?.message ||
-        "Could not import the file.",
+        JSON.stringify(
+          error?.body?.detail ||
+          error?.message ||
+          "Unknown import error",
+          null,
+          2,
+        ),
       );
     } finally {
       setBusy(false);
@@ -4572,11 +4584,7 @@ function QualityScreen({
               <Text style={styles.checkMeta}>
                 {check.count === 0
                   ? "No issues detected"
-                  : `check.countrecord{
-                  check.count === 1
-                  ? ""
-                  : "s"
-                } flagged`}
+                  : `${check.count} record${check.count === 1 ? "" : "s"} flagged`}
               </Text>
             </View>
 
