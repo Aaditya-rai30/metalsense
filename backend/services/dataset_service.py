@@ -17,11 +17,14 @@ from security.upload import (
     validate_dataframe_dimensions,
     validate_dataframe_security,
 )
-
+from services.location_service import (
+    resolve_dataframe_locations,
+)
 from database import db
 from engine.data_quality_engine import DataQualityEngine
 from engine.pollution_engine import METALS, calculate_indices
 from engine.temporal_engine import fill_missing_dates_from_season
+from services.pdf_service import parse_pdf
 from engine.pipeline import MetalSenseMLEngine
 from services.standards_service import (
     get_standards,
@@ -64,6 +67,11 @@ ALIASES = {
     "country": [
         "country",
     ],
+    "region": [
+        "region",
+        "state",
+        "province",
+    ],
     "water_type": [
         "water_type",
         "water type",
@@ -82,6 +90,16 @@ ALIASES = {
         "season",
         "sampling season",
         "sample season",
+    ],
+     "location_name": [
+        "location_name",
+        "location name",
+        "name of the location",
+        "location",
+        "site",
+        "sampling location",
+        "sample location",
+        "area",
     ],
 }
 
@@ -151,9 +169,46 @@ def find_metal_columns(
 
         if found:
             metal_columns[metal] = found
+            continue
+
+        # ----------------------------------------------------
+        # PDF-friendly fallback.
+        #
+        # Examples:
+        #   "Cadmium (mg/L)"
+        #   "Chromium Total (mg/L)"
+        #   "Lead concentration"
+        # ----------------------------------------------------
+
+        for normalized_column, original_column in columns.items():
+
+            compact_column = normalized_column.replace(
+                " ",
+                "",
+            )
+
+            for alias in aliases:
+
+                normalized_alias = normalize(alias)
+                compact_alias = normalized_alias.replace(
+                    " ",
+                    "",
+                )
+
+                if (
+                    normalized_alias in normalized_column
+                    or compact_alias in compact_column
+                ):
+                    found = original_column
+                    break
+
+            if found:
+                break
+
+        if found:
+            metal_columns[metal] = found
 
     return metal_columns
-
 
 # ============================================================
 # EXPORT QUALITY
@@ -828,65 +883,53 @@ async def parse_upload(
     file: UploadFile,
 ):
     """
-    Securely parse an uploaded CSV/XLS/XLSX dataset.
-
-    Security sequence:
-
-        filename validation
-              ↓
-        extension allowlist
-              ↓
-        bounded file read
-              ↓
-        basic file signature/content validation
-              ↓
-        Pandas parsing
-              ↓
-        dataframe dimension validation
-              ↓
-        normal MetalSense processing
+    Securely parse an uploaded CSV/XLS/XLSX/PDF dataset.
     """
-
-    # --------------------------------------------------------
-    # 1. Filename
-    # --------------------------------------------------------
 
     filename = validate_filename(
         file.filename
     )
 
-    # --------------------------------------------------------
-    # 2. Extension
-    # --------------------------------------------------------
-
     suffix = validate_extension(
         filename
     )
 
-    # --------------------------------------------------------
-    # 3. Secure bounded read
-    # --------------------------------------------------------
-
     raw = await read_upload_safely(
         file
     )
-
-    # --------------------------------------------------------
-    # 4. Basic content/signature validation
-    # --------------------------------------------------------
 
     validate_file_content(
         raw=raw,
         suffix=suffix,
     )
 
-    # --------------------------------------------------------
-    # 5. Parse with Pandas
-    # --------------------------------------------------------
-
     try:
 
-        if suffix == ".csv":
+        if suffix == ".pdf":
+
+            logger.info(
+                "Parsing PDF dataset with PyMuPDF: %s",
+                filename,
+            )
+
+            parsed_pdf = parse_pdf(
+                pdf_bytes=raw,
+                filename=filename,
+            )
+
+            df = parsed_pdf["dataframe"]
+
+            logger.info(
+                "PDF parsed successfully: "
+                "filename=%s pages=%s tables=%s rows=%s columns=%s",
+                filename,
+                parsed_pdf.get("pages_with_text"),
+                parsed_pdf.get("table_count"),
+                len(df),
+                len(df.columns),
+            )
+
+        elif suffix == ".csv":
 
             df = pd.read_csv(
                 io.BytesIO(raw)
@@ -898,36 +941,43 @@ async def parse_upload(
                 io.BytesIO(raw)
             )
 
-    except Exception as exc:
+    except ValueError as exc:
 
         logger.warning(
-            "Rejected malformed dataset %s: %s",
+            "Rejected dataset %s: %s",
             filename,
             exc,
+        )
+
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    except HTTPException:
+        raise
+
+    except Exception as exc:
+
+        logger.exception(
+            "Rejected malformed dataset %s",
+            filename,
         )
 
         raise HTTPException(
             status_code=400,
             detail=(
                 "Could not parse the uploaded file. "
-                "Please provide a valid CSV, XLSX, or XLS dataset."
+                "Please provide a valid CSV, XLSX, XLS, "
+                "or PDF dataset."
             ),
-        )
-
-    # --------------------------------------------------------
-    # 6. Empty dataset
-    # --------------------------------------------------------
+        ) from exc
 
     if df.empty:
-
         raise HTTPException(
             status_code=400,
             detail="The file contains no records.",
         )
-
-    # --------------------------------------------------------
-    # 7. Dataset dimensions
-    # --------------------------------------------------------
 
     validate_dataframe_dimensions(
         row_count=len(df),
@@ -1233,6 +1283,144 @@ def build_quality_dataframe(
         rows
     )
 
+# ============================================================
+# LOCATION OVERRIDES
+# ============================================================
+
+def normalize_location(value) -> str:
+    if value is None:
+        return ""
+
+    return " ".join(
+        str(value)
+        .strip()
+        .lower()
+        .split()
+    )
+
+
+def apply_location_overrides(
+    df: pd.DataFrame,
+    location_col: str | None,
+    overrides: dict,
+) -> tuple[pd.DataFrame, list[str]]:
+    """
+    Apply user-supplied coordinates to PDF locations.
+
+    Example:
+
+    {
+        "Yashoda Nagar, Ahmednagar": {
+            "latitude": 19.09,
+            "longitude": 74.74
+        }
+    }
+    """
+
+    df = df.copy()
+
+    if not location_col:
+        return df, []
+
+    if not overrides:
+        missing_locations = sorted({
+            str(value).strip()
+            for value in df[location_col]
+            if pd.notna(value)
+            and str(value).strip()
+        })
+
+        return df, missing_locations
+
+    normalized_overrides = {
+        normalize_location(location): coordinates
+        for location, coordinates
+        in overrides.items()
+    }
+
+    if "latitude" not in df.columns:
+        df["latitude"] = None
+
+    if "longitude" not in df.columns:
+        df["longitude"] = None
+
+    missing_locations = set()
+
+    for index, value in df[location_col].items():
+
+        location = normalize_location(value)
+
+        if not location:
+            missing_locations.add(
+                f"Row {index + 2}"
+            )
+            continue
+
+        override = normalized_overrides.get(
+            location
+        )
+
+        if not override:
+            # Keep any coordinates that were already
+            # present in the PDF.
+            existing_lat = df.at[
+                index,
+                "latitude",
+            ]
+
+            existing_lon = df.at[
+                index,
+                "longitude",
+            ]
+
+            if (
+                pd.isna(existing_lat)
+                or pd.isna(existing_lon)
+            ):
+                missing_locations.add(
+                    str(value).strip()
+                )
+
+            continue
+
+        latitude = override.get("latitude")
+        longitude = override.get("longitude")
+
+        try:
+            latitude = float(latitude)
+            longitude = float(longitude)
+        except (
+            TypeError,
+            ValueError,
+        ):
+            missing_locations.add(
+                str(value).strip()
+            )
+            continue
+
+        if not -90 <= latitude <= 90:
+            missing_locations.add(
+                str(value).strip()
+            )
+            continue
+
+        if not -180 <= longitude <= 180:
+            missing_locations.add(
+                str(value).strip()
+            )
+            continue
+
+        df.at[
+            index,
+            "latitude",
+        ] = latitude
+
+        df.at[
+            index,
+            "longitude",
+        ] = longitude
+
+    return df, sorted(missing_locations)
 
 # ============================================================
 # RAW DATA IMPORT
@@ -1259,15 +1447,217 @@ async def import_raw_dataset(
         ALIASES["longitude"],
     )
 
-    if not lat_col or not lon_col:
+    location_col = find_column(
+        columns,
+        ALIASES["location_name"],
+    )
 
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Required columns latitude "
-                "and longitude were not found."
-            ),
+    # --------------------------------------------------------
+    # PDF LOCATION COORDINATE RESOLUTION
+    # --------------------------------------------------------
+
+    location_overrides = (import_metadata.get("location_overrides", {}) or {})
+    columns = normalized_columns(df)
+    country_col = find_column(columns, ALIASES["country"])
+    region_col = find_column(columns, ALIASES.get("region", ["region", "state", "province"]))
+
+    if suffix == ".pdf":
+        if not lat_col:
+            df["latitude"] = None
+            lat_col = "latitude"
+        if not lon_col:
+            df["longitude"] = None
+            lon_col = "longitude"
+
+        # Explicit coordinates supplied by the user always win.
+        df, _ = apply_location_overrides(
+            df=df, location_col=location_col, overrides=location_overrides
         )
+
+        # Automatically geocode only locations still missing coordinates.
+        #
+        # PDF reports can contain hundreds of unique sampling locations.
+        # Resolve them in three internal batches so the geocoder budget is
+        # bounded per batch while the user still uploads only one PDF.
+        unresolved_locations = []
+
+        if location_col:
+            # Build a stable location key so the same PDF location is kept
+            # in exactly one batch instead of being geocoded repeatedly.
+            def _location_batch_key(row):
+                location = row.get(location_col, "")
+                country = (
+                    row.get(country_col, "")
+                    if country_col
+                    else ""
+                )
+                region = (
+                    row.get(region_col, "")
+                    if region_col
+                    else ""
+                )
+
+                return (
+                    " ".join(str(location).strip().lower().split()),
+                    " ".join(str(country).strip().lower().split()),
+                    " ".join(str(region).strip().lower().split()),
+                )
+
+            location_groups = {}
+
+            for row_index in df.index:
+                key = _location_batch_key(
+                    df.loc[row_index]
+                )
+
+                location_groups.setdefault(
+                    key,
+                    [],
+                ).append(row_index)
+
+            # Keep the three batches approximately balanced by number of
+            # unique locations, not by raw row count.
+            unique_keys = list(
+                location_groups.keys()
+            )
+
+            batch_keys = [
+                [],
+                [],
+                [],
+            ]
+
+            for position, key in enumerate(
+                unique_keys
+            ):
+                batch_keys[
+                    position % 3
+                ].append(key)
+
+            resolved_batches = []
+
+            for batch_number, keys in enumerate(
+                batch_keys,
+                start=1,
+            ):
+                if not keys:
+                    continue
+
+                batch_indices = []
+
+                for key in keys:
+                    batch_indices.extend(
+                        location_groups[key]
+                    )
+
+                batch_indices.sort()
+
+                batch_df = df.loc[
+                    batch_indices
+                ].copy()
+
+                logger.info(
+                    "PDF location batch %s/3: "
+                    "rows=%s unique_locations=%s",
+                    batch_number,
+                    len(batch_df),
+                    len(keys),
+                )
+
+                batch_df, batch_unresolved = (
+                    resolve_dataframe_locations(
+                        df=batch_df,
+                        location_col=location_col,
+                        country_col=country_col,
+                        region_col=region_col,
+                        max_requests=50,
+                    )
+                )
+
+                resolved_batches.append(
+                    batch_df
+                )
+
+                unresolved_locations.extend(
+                    batch_unresolved
+                )
+
+            if resolved_batches:
+                df = pd.concat(
+                    resolved_batches,
+                    axis=0,
+                ).sort_index()
+
+            # Deduplicate structured review locations across batches.
+            unique_unresolved = {}
+
+            for item in unresolved_locations:
+                if isinstance(item, dict):
+                    key = (
+                        item.get("location")
+                        or item.get("suggested_query")
+                        or str(item)
+                    )
+                    unique_unresolved[
+                        key
+                    ] = item
+                else:
+                    key = str(item)
+                    unique_unresolved[
+                        key
+                    ] = {
+                        "location": key,
+                        "country": None,
+                        "region": None,
+                        "suggested_query": key,
+                        "reason": (
+                            "Could not resolve coordinates "
+                            "automatically."
+                        ),
+                    }
+
+            unresolved_locations = list(
+                unique_unresolved.values()
+            )
+
+            logger.info(
+                "PDF location batches complete: "
+                "rows=%s unresolved_locations=%s",
+                len(df),
+                len(unresolved_locations),
+            )
+
+        columns = normalized_columns(df)
+        lat_col = find_column(columns, ALIASES["latitude"])
+        lon_col = find_column(columns, ALIASES["longitude"])
+
+        if unresolved_locations:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "MISSING_REQUIREMENTS",
+                    "message": "Some PDF sampling locations could not be resolved automatically.",
+                    "requirements": [{
+                        "field": "coordinates",
+                        "label": "Sampling coordinates",
+                        "required": True,
+                        "input_type": "location_coordinates",
+                        "reason": "MetalSense extracted sampling locations but could not determine reliable coordinates for all of them.",
+                        "locations": unresolved_locations,
+                    }],
+                    "preview": {
+                        "filename": filename,
+                        "rows_extracted": len(df),
+                        "columns": [str(column) for column in df.columns],
+                    },
+                },
+            )
+    else:
+        if not lat_col or not lon_col:
+            raise HTTPException(
+                status_code=422,
+                detail="Required columns latitude and longitude were not found.",
+            )
 
     sample_id_col = find_column(
         columns,
@@ -1826,6 +2216,15 @@ async def import_raw_dataset(
                 "geo_source":
                     geo["source"],
 
+                "location_resolution":
+                    source_row.get("location_resolution", "provided"),
+
+                "location_confidence":
+                    source_row.get("location_confidence", "provided"),
+
+                "location_source":
+                    source_row.get("location_source", geo.get("source", "Unknown")),
+
                 "standard":
                     metadata[
                         "standard"
@@ -1942,8 +2341,23 @@ async def import_raw_dataset(
         "detection_limit":
             import_metadata["detection_limit"],
 
-        "source_type":
-            "raw_measurements",
+        "source_type": (
+            "pdf_report"
+            if suffix == ".pdf"
+            else "raw_measurements"
+        ),
+
+        "source_format": (
+            "PDF"
+            if suffix == ".pdf"
+            else suffix[1:].upper()
+        ),
+
+        "import_parser": (
+            "PyMuPDF"
+            if suffix == ".pdf"
+            else "Pandas"
+        ),
 
         "imported_at":
             pd.Timestamp.now(

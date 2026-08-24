@@ -24,6 +24,7 @@ ALLOWED_EXTENSIONS = {
     ".csv",
     ".xlsx",
     ".xls",
+    ".pdf",
 }
 
 
@@ -86,7 +87,7 @@ def validate_extension(filename: str) -> str:
             status_code=400,
             detail=(
                 "Unsupported file type. "
-                "Only CSV, XLSX, and XLS files are allowed."
+                "Only CSV, XLSX, XLS, and PDF files are allowed."
             ),
         )
 
@@ -271,6 +272,23 @@ def validate_file_content(
             status_code=400,
             detail="The uploaded file is empty.",
         )
+
+
+    # --------------------------------------------------------
+    # PDF
+    # --------------------------------------------------------
+
+    if suffix == ".pdf":
+        if not raw.startswith(b"%PDF-"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "The uploaded PDF file has an invalid "
+                    "file signature."
+                ),
+            )
+
+        return
 
     # --------------------------------------------------------
     # CSV

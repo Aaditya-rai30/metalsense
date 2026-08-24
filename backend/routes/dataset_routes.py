@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -45,10 +47,14 @@ async def upload_dataset(
     analytical_method: str = Form(...),
     detection_limit: str = Form(...),
 
-    user: dict = Depends(require_current_user),
+    location_overrides: str = Form("{}"),
+
+    user: dict = Depends(
+        require_current_user
+    ),
 ):
     """
-    Upload CSV/XLS/XLSX dataset.
+    Upload CSV/XLS/XLSX/PDF dataset.
 
     Security layers:
 
@@ -87,6 +93,40 @@ async def upload_dataset(
     }
 
     # --------------------------------------------------------
+    # OPTIONAL PDF LOCATION COORDINATE OVERRIDES
+    # --------------------------------------------------------
+
+    try:
+
+        parsed_location_overrides = json.loads(
+            location_overrides
+        )
+
+        if not isinstance(
+            parsed_location_overrides,
+            dict,
+        ):
+            raise ValueError(
+                "location_overrides must be an object."
+            )
+
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message":
+                    "Invalid location coordinate data.",
+
+                "problem":
+                    str(exc),
+            },
+        ) from exc
+
+    # --------------------------------------------------------
     # REQUIRED METADATA VALIDATION
     # --------------------------------------------------------
 
@@ -97,6 +137,7 @@ async def upload_dataset(
     ]
 
     if missing:
+
         raise HTTPException(
             status_code=422,
             detail={
@@ -107,6 +148,14 @@ async def upload_dataset(
                     missing,
             },
         )
+
+    # --------------------------------------------------------
+    # ADD LOCATION OVERRIDES
+    # --------------------------------------------------------
+
+    metadata[
+        "location_overrides"
+    ] = parsed_location_overrides
 
     # --------------------------------------------------------
     # IMPORT DATASET
@@ -128,12 +177,10 @@ async def upload_dataset(
     summary="Get Datasets",
 )
 async def get_datasets(
-    user: dict = Depends(require_current_user),
+    user: dict = Depends(
+        require_current_user
+    ),
 ):
-    """
-    Return only datasets belonging to the authenticated user.
-    """
-
     return await list_datasets(
         user
     )
@@ -148,12 +195,10 @@ async def get_datasets(
     summary="Remove All Datasets",
 )
 async def remove_all_datasets(
-    user: dict = Depends(require_current_user),
+    user: dict = Depends(
+        require_current_user
+    ),
 ):
-    """
-    Delete all datasets belonging to the authenticated user.
-    """
-
     return await clear_datasets(
         user
     )
@@ -170,13 +215,10 @@ async def remove_all_datasets(
 async def remove_dataset(
     dataset_id: str,
 
-    user: dict = Depends(require_current_user),
+    user: dict = Depends(
+        require_current_user
+    ),
 ):
-    """
-    Delete a dataset only if it belongs to the
-    authenticated user.
-    """
-
     return await delete_dataset(
         dataset_id,
         user,
