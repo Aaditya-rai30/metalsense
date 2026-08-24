@@ -294,14 +294,10 @@ SCORING_WEIGHTS = {
 
 @dataclass
 class IssueGroup:
-    """Stores findings for one validation category."""
-
     name: str
     label: str
 
-    affected_rows: list[int] = field(
-        default_factory=list
-    )
+    affected_rows: list[int] = field(default_factory=list)
 
     details: list[dict[str, Any]] = field(
         default_factory=list
@@ -311,26 +307,7 @@ class IssueGroup:
     penalty: float = 0.0
     recommendation: str = ""
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "check": self.label,
-            "affected_row_count": len(
-                self.affected_rows
-            ),
-            "pct_affected": round(
-                self.pct_affected,
-                2,
-            ),
-            "score_penalty": round(
-                self.penalty,
-                2,
-            ),
-            "sample_issues": self.details[:10],
-            "recommendation":
-                self.recommendation,
-        }
-
-
+    blocking: bool = False
 # ============================================================
 # ENGINE
 # ============================================================
@@ -707,10 +684,11 @@ class DataQualityEngine:
                 )
 
         self._record_issue(
-            "duplicates",
+           "duplicates",
             "Duplicate Records",
             dup_rows,
             details,
+            blocking=len(dup_rows) > 0,
             (
                 "Deduplicate repeated observations "
                 "using (sample_id, metal). Exact duplicate "
@@ -862,8 +840,11 @@ class DataQualityEngine:
                     )
 
         self._record_issue(
-            "invalid_coordinates",
+           "invalid_coordinates",
             "Invalid Coordinates",
+            bad_rows,
+            details,
+            blocking=len(bad_rows) > 0,
             bad_rows,
             details,
             (
@@ -1055,13 +1036,14 @@ class DataQualityEngine:
             self._record_issue(
                 "outliers_anomalies",
                 "Outliers / Anomalies",
-                [],
-                [],
-                (
-                    "N/A - required concentration "
-                    "columns are missing."
-                ),
-            )
+                bad_rows,
+                details,
+                blocking=any(
+                "outside plausible range"
+                in d.get("reason","")
+                for d in details
+    ),
+)
 
             return
 
@@ -1557,6 +1539,11 @@ class DataQualityEngine:
         score: float,
     ) -> dict[str, Any]:
 
+        blocking_checks = {
+        key: issue.to_dict()
+        for key, issue in self.issues.items()
+        if issue.blocking
+        }
         flagged_rows = {
             row
             for issue in self.issues.values()
@@ -1616,6 +1603,8 @@ class DataQualityEngine:
                     for key, issue
                     in self.issues.items()
                 },
+                "requires_review": bool(blocking_checks),
+                "blocking_issues": blocking_checks,
         }
 
     # ========================================================

@@ -995,11 +995,38 @@ async def parse_upload(
 # REVERSE GEOCODING
 # ============================================================
 
+_REVERSE_GEO_CACHE: dict = {}
+_REVERSE_GEO_LAST_REQUEST = 0.0
+
+
 def reverse_geo(
     latitude: float,
     longitude: float,
 ):
+    import time as _time
+
+    global _REVERSE_GEO_LAST_REQUEST
+
+    # Cache on rounded coordinates (~1km grid) so repeat samples at the
+    # same site, and repeated imports, don't re-hit Nominatim at all.
+    cache_key = (
+        round(latitude, 3),
+        round(longitude, 3),
+    )
+
+    if cache_key in _REVERSE_GEO_CACHE:
+        return _REVERSE_GEO_CACHE[cache_key]
+
+    # Respect Nominatim's ~1 req/sec usage policy. Without this, bulk
+    # imports (dozens/hundreds of rows) fire requests back-to-back,
+    # get rate-limited, and every row silently falls back to "Unknown".
+    elapsed = _time.time() - _REVERSE_GEO_LAST_REQUEST
+    if elapsed < 1.1:
+        _time.sleep(1.1 - elapsed)
+
     try:
+
+        _REVERSE_GEO_LAST_REQUEST = _time.time()
 
         response = requests.get(
             "https://nominatim.openstreetmap.org/reverse",
@@ -1023,7 +1050,7 @@ def reverse_geo(
             {},
         )
 
-        return {
+        result = {
             "country":
                 address.get(
                     "country",
@@ -1057,6 +1084,13 @@ def reverse_geo(
             "confidence":
                 "reverse-geocoded",
         }
+
+        # Only cache real results, not "Unknown" fallbacks, so a
+        # transient failure doesn't get baked in for future imports.
+        if result["country"] != "Unknown":
+            _REVERSE_GEO_CACHE[cache_key] = result
+
+        return result
 
     except Exception:
 
@@ -1485,6 +1519,21 @@ async def import_raw_dataset(
             df["longitude"] = None
             lon_col = "longitude"
 
+        # MetalSense PDFs almost never have an explicit "Country"/"Region"
+        # column. Without one, resolve_dataframe_locations() has nowhere
+        # to write the country/region it geocodes (it only backfills
+        # into an existing column), so every row later falls back to
+        # reverse_geo() -> hundreds of unthrottled, uncached Nominatim
+        # reverse-geocode calls that get rate-limited and come back
+        # "Unknown", wiping out every record. Pre-create the columns so
+        # the geocoding step can fill them in directly, same as lat/lon.
+        if not country_col:
+            df["country"] = None
+            country_col = "country"
+        if not region_col:
+            df["region"] = None
+            region_col = "region"
+
         # Explicit coordinates supplied by the user always win.
         df, _ = apply_location_overrides(
             df=df, location_col=location_col, overrides=location_overrides
@@ -1636,13 +1685,22 @@ async def import_raw_dataset(
 
     if not metal_columns:
 
+        logger.error(
+            "NO METALS DETECTED. PDF/CSV extracted columns=%s",
+            list(df.columns),
+        )
+
         raise HTTPException(
             status_code=422,
-            detail=(
-                "At least one supported heavy-metal "
-                "column is required: "
-                "Pb, Cd, As, Cr, Hg, Ni, Cu, Zn, Fe, Mn."
-            ),
+            detail={
+                "error": "NO_METALS",
+                "message": (
+                    "At least one supported heavy-metal "
+                    "column is required: "
+                    "Pb, Cd, As, Cr, Hg, Ni, Cu, Zn, Fe, Mn."
+                ),
+                "columns": [str(column) for column in df.columns],
+            },
         )
 
     # --------------------------------------------------------
@@ -1688,6 +1746,20 @@ async def import_raw_dataset(
         quality_report = (
             quality_engine.run()
         )
+        if quality_report.get("requires_review"):
+
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "DATA_VALIDATION_FAILED",
+                    "message":
+                    "Dataset contains validation issues. Please correct the highlighted values.",
+                    "issues":
+                    quality_report["blocking_issues"],
+                    "quality":
+                    quality_report,
+                },
+    )
 
     except Exception as exc:
 
@@ -2197,7 +2269,10 @@ async def import_raw_dataset(
             status_code=422,
             detail={
                 "message":
-                    "No valid records were produced.",
+                    "Dataset validation failed. Please correct the file and upload again.",
+
+                "errors":
+                    errors,
 
                 "quality_report":
                     quality_report,

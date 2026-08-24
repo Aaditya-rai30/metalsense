@@ -1410,6 +1410,24 @@ def _submit_geoapify_batch_queries(
                 "result_type": item.get(
                     "result_type"
                 ),
+                # Geoapify batch results return country/state at the
+                # top level (not nested under "address" like Nominatim).
+                # These were previously never captured, so
+                # resolve_dataframe_locations() had nothing to
+                # backfill into the country/region columns even for
+                # rows that resolved successfully.
+                "country": item.get(
+                    "country"
+                ),
+                "region": (
+                    item.get("state")
+                    or item.get("county")
+                ),
+                "area": (
+                    item.get("city")
+                    or item.get("district")
+                    or item.get("suburb")
+                ),
             }
 
         else:

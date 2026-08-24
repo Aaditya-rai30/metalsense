@@ -706,8 +706,9 @@ function getQualityChecks(dataset?: Dataset) {
     },
     {
       label: "Duplicate sample IDs",
-      count: countOrFallback(
-        quality.duplicates,
+      count: Number(
+        quality?.engine_report?.checks?.duplicates?.affected_row_count ??
+        quality.duplicates ??
         duplicateIds.size,
       ),
       icon: "copy-outline" as keyof typeof Ionicons.glyphMap,
@@ -726,8 +727,11 @@ function getQualityChecks(dataset?: Dataset) {
       icon: "calendar-outline" as keyof typeof Ionicons.glyphMap,
     },
     {
-      label: "Statistical outliers (z-score > 2σ)",
-      count: outliers,
+      label: "Pollution outliers / anomalies",
+      count: Number(
+        quality?.engine_report?.checks?.outliers_anomalies?.affected_row_count ??
+        outliers,
+      ),
       icon: "stats-chart-outline" as keyof typeof Ionicons.glyphMap,
     },
   ];
@@ -11484,5 +11488,4 @@ function createStyles() {
 styles = createStyles();
 
 export { API };
-
 

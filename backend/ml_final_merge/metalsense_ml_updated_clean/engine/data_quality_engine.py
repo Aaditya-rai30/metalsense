@@ -430,6 +430,7 @@ class IssueGroup:
     pct_affected: float = 0.0
     penalty: float = 0.0
     recommendation: str = ""
+    blocking: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -445,6 +446,7 @@ class IssueGroup:
                 self.penalty,
                 2,
             ),
+            "blocking": self.blocking,
             "sample_issues": self.details[:10],
             "recommendation":
                 self.recommendation,
@@ -540,6 +542,7 @@ class DataQualityEngine:
         rows: list[int],
         details: list[dict],
         recommendation: str,
+        blocking: bool = False,
     ):
 
         pct = (
@@ -561,12 +564,13 @@ class DataQualityEngine:
 
         self.issues[key] = IssueGroup(
             name=key,
-            label=label,
-            affected_rows=rows,
-            details=details,
-            pct_affected=pct,
-            penalty=penalty,
-            recommendation=recommendation,
+    label=label,
+    affected_rows=rows,
+    details=details,
+    pct_affected=pct,
+    penalty=penalty,
+    recommendation=recommendation,
+    blocking=blocking,
         )
 
     # ========================================================
@@ -840,6 +844,7 @@ class DataQualityEngine:
                 "using (sample_id, metal). Exact duplicate "
                 "rows should also be removed before analysis."
             ),
+            blocking=bool(dup_rows),
         )
 
     # ========================================================
@@ -996,6 +1001,7 @@ class DataQualityEngine:
                 "coordinates against the expected "
                 "region before accepting a sample."
             ),
+            blocking=bool(bad_rows),
         )
 
     # ========================================================
