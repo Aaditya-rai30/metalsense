@@ -29,10 +29,6 @@ router = APIRouter(
 )
 
 
-# ============================================================
-# IMPORT DATASET
-# ============================================================
-
 @router.post(
     "/import",
     summary="Upload Dataset",
@@ -40,95 +36,25 @@ router = APIRouter(
 async def upload_dataset(
     request: Request,
     file: UploadFile = File(...),
-
     data_source: str = Form(...),
     laboratory_organization: str = Form(...),
     report_id: str = Form(...),
     analytical_method: str = Form(...),
     detection_limit: str = Form(...),
-
-    location_overrides: str = Form("{}"),
-
-    user: dict = Depends(
-        require_current_user
-    ),
+    location_overrides: str | None = Form(None),
+    user: dict = Depends(require_current_user),
 ):
-    """
-    Upload CSV/XLS/XLSX/PDF dataset.
-
-    Security layers:
-
-        1. IP-based API rate limiting
-        2. Bearer-token authentication
-        3. Metadata validation
-        4. Secure file validation
-        5. Dataset/data-quality validation
-    """
-
-    # --------------------------------------------------------
-    # RATE LIMIT
-    # --------------------------------------------------------
+    """Upload a dataset, optionally with user-confirmed PDF coordinates."""
 
     rate_limit_api(request)
 
-    # --------------------------------------------------------
-    # IMPORT METADATA
-    # --------------------------------------------------------
-
     metadata = {
-        "data_source":
-            data_source.strip(),
-
-        "laboratory_organization":
-            laboratory_organization.strip(),
-
-        "report_id":
-            report_id.strip(),
-
-        "analytical_method":
-            analytical_method.strip(),
-
-        "detection_limit":
-            detection_limit.strip(),
+        "data_source": data_source.strip(),
+        "laboratory_organization": laboratory_organization.strip(),
+        "report_id": report_id.strip(),
+        "analytical_method": analytical_method.strip(),
+        "detection_limit": detection_limit.strip(),
     }
-
-    # --------------------------------------------------------
-    # OPTIONAL PDF LOCATION COORDINATE OVERRIDES
-    # --------------------------------------------------------
-
-    try:
-
-        parsed_location_overrides = json.loads(
-            location_overrides
-        )
-
-        if not isinstance(
-            parsed_location_overrides,
-            dict,
-        ):
-            raise ValueError(
-                "location_overrides must be an object."
-            )
-
-    except (
-        TypeError,
-        ValueError,
-    ) as exc:
-
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message":
-                    "Invalid location coordinate data.",
-
-                "problem":
-                    str(exc),
-            },
-        ) from exc
-
-    # --------------------------------------------------------
-    # REQUIRED METADATA VALIDATION
-    # --------------------------------------------------------
 
     missing = [
         field
@@ -137,29 +63,33 @@ async def upload_dataset(
     ]
 
     if missing:
-
         raise HTTPException(
             status_code=422,
             detail={
-                "message":
-                    "All import metadata fields are required.",
-
-                "missing_fields":
-                    missing,
+                "message": "All import metadata fields are required.",
+                "missing_fields": missing,
             },
         )
 
-    # --------------------------------------------------------
-    # ADD LOCATION OVERRIDES
-    # --------------------------------------------------------
+    # Coordinates confirmed in the Location Review modal arrive as JSON.
+    if location_overrides:
+        try:
+            parsed_overrides = json.loads(location_overrides)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise HTTPException(
+                status_code=422,
+                detail="Invalid location_overrides payload.",
+            ) from exc
 
-    metadata[
-        "location_overrides"
-    ] = parsed_location_overrides
+        if not isinstance(parsed_overrides, dict):
+            raise HTTPException(
+                status_code=422,
+                detail="location_overrides must be a JSON object.",
+            )
 
-    # --------------------------------------------------------
-    # IMPORT DATASET
-    # --------------------------------------------------------
+        metadata["location_overrides"] = parsed_overrides
+    else:
+        metadata["location_overrides"] = {}
 
     return await import_dataset(
         file=file,
@@ -168,58 +98,23 @@ async def upload_dataset(
     )
 
 
-# ============================================================
-# LIST DATASETS
-# ============================================================
-
-@router.get(
-    "",
-    summary="Get Datasets",
-)
+@router.get("")
 async def get_datasets(
-    user: dict = Depends(
-        require_current_user
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    return await list_datasets(
-        user
-    )
+    return await list_datasets(user)
 
 
-# ============================================================
-# DELETE ALL DATASETS
-# ============================================================
-
-@router.delete(
-    "",
-    summary="Remove All Datasets",
-)
+@router.delete("")
 async def remove_all_datasets(
-    user: dict = Depends(
-        require_current_user
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    return await clear_datasets(
-        user
-    )
+    return await clear_datasets(user)
 
 
-# ============================================================
-# DELETE ONE DATASET
-# ============================================================
-
-@router.delete(
-    "/{dataset_id}",
-    summary="Remove Dataset",
-)
+@router.delete("/{dataset_id}")
 async def remove_dataset(
     dataset_id: str,
-
-    user: dict = Depends(
-        require_current_user
-    ),
+    user: dict = Depends(require_current_user),
 ):
-    return await delete_dataset(
-        dataset_id,
-        user,
-    )
+    return await delete_dataset(dataset_id, user)

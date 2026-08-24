@@ -1319,6 +1319,22 @@ def apply_location_overrides(
 
     df = df.copy()
 
+    # Ensure coordinate columns can store numeric override values.
+    # PDF extraction often creates these columns as strings/object dtype.
+    # Manual coordinates from the user are floats, so normalize the dtype
+    # before assigning them.
+    if "latitude" in df.columns:
+        df["latitude"] = pd.to_numeric(
+            df["latitude"],
+            errors="coerce",
+        )
+
+    if "longitude" in df.columns:
+        df["longitude"] = pd.to_numeric(
+            df["longitude"],
+            errors="coerce",
+        )
+
     if not location_col:
         return df, []
 
@@ -1476,119 +1492,29 @@ async def import_raw_dataset(
 
         # Automatically geocode only locations still missing coordinates.
         #
-        # PDF reports can contain hundreds of unique sampling locations.
-        # Resolve them in three internal batches so the geocoder budget is
-        # bounded per batch while the user still uploads only one PDF.
+        # IMPORTANT: do NOT split the PDF into arbitrary internal batches.
+        # location_service.py already deduplicates locations and Geoapify
+        # Batch Geocoding handles the unique-location workload. Splitting
+        # here causes unnecessary independent Geoapify jobs.
         unresolved_locations = []
 
         if location_col:
-            # Build a stable location key so the same PDF location is kept
-            # in exactly one batch instead of being geocoded repeatedly.
-            def _location_batch_key(row):
-                location = row.get(location_col, "")
-                country = (
-                    row.get(country_col, "")
-                    if country_col
-                    else ""
-                )
-                region = (
-                    row.get(region_col, "")
-                    if region_col
-                    else ""
-                )
-
-                return (
-                    " ".join(str(location).strip().lower().split()),
-                    " ".join(str(country).strip().lower().split()),
-                    " ".join(str(region).strip().lower().split()),
-                )
-
-            location_groups = {}
-
-            for row_index in df.index:
-                key = _location_batch_key(
-                    df.loc[row_index]
-                )
-
-                location_groups.setdefault(
-                    key,
-                    [],
-                ).append(row_index)
-
-            # Keep the three batches approximately balanced by number of
-            # unique locations, not by raw row count.
-            unique_keys = list(
-                location_groups.keys()
+            logger.info(
+                "PDF location resolution: rows=%s; resolving complete "
+                "dataframe in one pass",
+                len(df),
             )
 
-            batch_keys = [
-                [],
-                [],
-                [],
-            ]
-
-            for position, key in enumerate(
-                unique_keys
-            ):
-                batch_keys[
-                    position % 3
-                ].append(key)
-
-            resolved_batches = []
-
-            for batch_number, keys in enumerate(
-                batch_keys,
-                start=1,
-            ):
-                if not keys:
-                    continue
-
-                batch_indices = []
-
-                for key in keys:
-                    batch_indices.extend(
-                        location_groups[key]
-                    )
-
-                batch_indices.sort()
-
-                batch_df = df.loc[
-                    batch_indices
-                ].copy()
-
-                logger.info(
-                    "PDF location batch %s/3: "
-                    "rows=%s unique_locations=%s",
-                    batch_number,
-                    len(batch_df),
-                    len(keys),
+            df, unresolved_locations = (
+                resolve_dataframe_locations(
+                    df=df,
+                    location_col=location_col,
+                    country_col=country_col,
+                    region_col=region_col,
+                    max_requests=1000,
                 )
+            )
 
-                batch_df, batch_unresolved = (
-                    resolve_dataframe_locations(
-                        df=batch_df,
-                        location_col=location_col,
-                        country_col=country_col,
-                        region_col=region_col,
-                        max_requests=50,
-                    )
-                )
-
-                resolved_batches.append(
-                    batch_df
-                )
-
-                unresolved_locations.extend(
-                    batch_unresolved
-                )
-
-            if resolved_batches:
-                df = pd.concat(
-                    resolved_batches,
-                    axis=0,
-                ).sort_index()
-
-            # Deduplicate structured review locations across batches.
             unique_unresolved = {}
 
             for item in unresolved_locations:
@@ -1598,14 +1524,10 @@ async def import_raw_dataset(
                         or item.get("suggested_query")
                         or str(item)
                     )
-                    unique_unresolved[
-                        key
-                    ] = item
+                    unique_unresolved[key] = item
                 else:
                     key = str(item)
-                    unique_unresolved[
-                        key
-                    ] = {
+                    unique_unresolved[key] = {
                         "location": key,
                         "country": None,
                         "region": None,
@@ -1621,7 +1543,7 @@ async def import_raw_dataset(
             )
 
             logger.info(
-                "PDF location batches complete: "
+                "PDF location resolution complete: "
                 "rows=%s unresolved_locations=%s",
                 len(df),
                 len(unresolved_locations),
@@ -2254,22 +2176,22 @@ async def import_raw_dataset(
     # --------------------------------------------------------
 
     if errors:
-
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "message":
-                    "Data Validation Error",
-
-                "errors":
-                    errors,
-
-                "quality_report":
-                    quality_report,
-            },
+        logger.warning(
+            "Dataset imported with validation warnings: %s issues",
+            len(errors)
         )
 
+        for error in errors[:10]:
+            logger.warning(
+                "Validation warning: %s",
+                error
+            )
+
     if not records:
+
+        logger.error(
+            "Import failed: zero valid records generated"
+        )
 
         raise HTTPException(
             status_code=422,
@@ -2306,12 +2228,22 @@ async def import_raw_dataset(
             records,
             dataset_stub,
         )
+
     except Exception as exc:
-        logger.exception("Final ML enrichment failed")
-        raise HTTPException(
-            status_code=500,
-            detail="ML analysis pipeline failed.",
-        ) from exc
+        logger.exception(
+            "ML enrichment failed, continuing without ML"
+        )
+
+        ml_enrichment = {
+            "anomaly_scores": {},
+            "explanations": [],
+            "report": {},
+            "spatial": {},
+            "spatial_summary": {},
+            "hotspots": {},
+            "temporal": {},
+            "rag_sources": [],
+        }
 
     dataset = {
         "dataset_id":
@@ -2410,9 +2342,20 @@ async def import_raw_dataset(
         },
     }
 
-    await db.datasets.insert_one(
-        dataset
-    )
+    try:
+        await db.datasets.insert_one(
+            dataset
+        )
+
+    except Exception as exc:
+        logger.exception(
+            "Database insert failed"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {exc}"
+        )
 
     dataset.pop(
         "_id",

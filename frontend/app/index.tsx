@@ -75,63 +75,63 @@ let styles: any = createStyles();
  * ============================================================ */
 
 const backend =
-Constants.expoConfig?.extra?.backendUrl ||
-process.env.EXPO_PUBLIC_BACKEND_URL ||
-process.env.EXPO_BACKEND_URL ||
-"http://localhost:8000";
+  Constants.expoConfig?.extra?.backendUrl ||
+  process.env.EXPO_PUBLIC_BACKEND_URL ||
+  process.env.EXPO_BACKEND_URL ||
+  "http://localhost:8000";
 
-  const API = `${backend.replace(/\/$/, "")}/api`;
+const API = `${backend.replace(/\/$/, "")}/api`;
 
-  const GOOGLE_MAPS_API_KEY =
+const GOOGLE_MAPS_API_KEY =
   process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
-  /* ============================================================
-   *   T YPES       *
-   *   ============================================================ */
+/* ============================================================
+ *   T YPES       *
+ *   ============================================================ */
 
-  type User = {
-    user_id?: string;
-    full_name: string;
-    email: string;
-    account_type: string;
-    organization?: string;
-    role: string;
-    institution?: string;
-    research_area?: string;
-    created_at: string;
+type User = {
+  user_id?: string;
+  full_name: string;
+  email: string;
+  account_type: string;
+  organization?: string;
+  role: string;
+  institution?: string;
+  research_area?: string;
+  created_at: string;
+};
+
+type Dataset = {
+  dataset_id: string;
+  user_id?: string;
+  source_type?: string;
+  filename: string;
+  file_type: string;
+  imported_at: string;
+  columns: string[];
+  records: Record<string, any>[];
+  quality: {
+    score?: number;
+    type?: string;
+    label?: string;
+    status?: string;
+    missing?: number;
+    analysis_issues?: number;
+    coordinate_issues?: number;
+    duplicates?: number;
+    valid_records?: number;
+    invalid_records?: number;
+    engine_report?: any;
+    [key: string]: any;
   };
+  data_source?: string;
+  laboratory_organization?: string;
+  report_id?: string;
+  analytical_method?: string;
+  detection_limit?: string;
+};
 
-  type Dataset = {
-    dataset_id: string;
-    user_id?: string;
-    source_type?: string;
-    filename: string;
-    file_type: string;
-    imported_at: string;
-    columns: string[];
-    records: Record<string, any>[];
-    quality: {
-      score?: number;
-      type?: string;
-      label?: string;
-      status?: string;
-      missing?: number;
-      analysis_issues?: number;
-      coordinate_issues?: number;
-      duplicates?: number;
-      valid_records?: number;
-      invalid_records?: number;
-      engine_report?: any;
-      [key: string]: any;
-    };
-    data_source?: string;
-    laboratory_organization?: string;
-    report_id?: string;
-    analytical_method?: string;
-    detection_limit?: string;
-  };
-
-  type Page =
+type Page =
   | "dashboard"
   | "import"
   | "quality"
@@ -140,727 +140,727 @@ process.env.EXPO_BACKEND_URL ||
   | "reports"
   | "profile";
 
-  type LocationReview = {
-    location: string;
-    country?: string;
-    region?: string;
-    suggested_query?: string;
-    reason?: string;
-  };
+type LocationReview = {
+  location: string;
+  country?: string;
+  region?: string;
+  suggested_query?: string;
+  reason?: string;
+};
 
-  /* ============================================================
-   *   N AVIGATION  *
-   *   ============================================================ */
+/* ============================================================
+ *   N AVIGATION  *
+ *   ============================================================ */
 
-  const NAV: {
-    id: Page;
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-  }[] = [
+const NAV: {
+  id: Page;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
     {
       id: "dashboard",
       label: "Dashboard",
       icon: "grid-outline",
     },
-{
-  id: "import",
-  label: "Data Import",
-  icon: "cloud-upload-outline",
-},
-{
-  id: "quality",
-  label: "Data Quality",
-  icon: "shield-checkmark-outline",
-},
-{
-  id: "analysis",
-  label: "Pollution Analysis",
-  icon: "analytics-outline",
-},
-{
-  id: "spatial",
-  label: "Spatial & Temporal",
-  icon: "map-outline",
-},
-{
-  id: "reports",
-  label: "Reports & Decisions",
-  icon: "document-text-outline",
-},
-{
-  id: "profile",
-  label: "Profile",
-  icon: "person-outline",
-},
+    {
+      id: "import",
+      label: "Data Import",
+      icon: "cloud-upload-outline",
+    },
+    {
+      id: "quality",
+      label: "Data Quality",
+      icon: "shield-checkmark-outline",
+    },
+    {
+      id: "analysis",
+      label: "Pollution Analysis",
+      icon: "analytics-outline",
+    },
+    {
+      id: "spatial",
+      label: "Spatial & Temporal",
+      icon: "map-outline",
+    },
+    {
+      id: "reports",
+      label: "Reports & Decisions",
+      icon: "document-text-outline",
+    },
+    {
+      id: "profile",
+      label: "Profile",
+      icon: "person-outline",
+    },
   ];
 
-  class ApiError extends Error {
-    status: number;
-    body: any;
+class ApiError extends Error {
+  status: number;
+  body: any;
 
-    constructor(
-      status: number,
-      message: string,
-      body: any,
-    ) {
-      super(message);
-      this.name = "ApiError";
-      this.status = status;
-      this.body = body;
-    }
+  constructor(
+    status: number,
+    message: string,
+    body: any,
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+/* ============================================================
+ *   A PI HELPER  *
+ *   ============================================================ */
+
+async function api(
+  path: string,
+  options: RequestInit = {},
+  token?: string,
+) {
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> | undefined),
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
-  /* ============================================================
-   *   A PI HELPER  *
-   *   ============================================================ */
+  const response = await fetch(`${API}${path}`, {
+    ...options,
+    headers,
+  });
 
-  async function api(
-    path: string,
-    options: RequestInit = {},
-    token?: string,
-  ) {
-    const headers: Record<string, string> = {
-      ...(options.headers as Record<string, string> | undefined),
+  const text = await response.text();
+
+  let body: any = {};
+
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = {
+      message: text,
     };
+  }
 
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
+  if (!response.ok) {
+    let message = "Something went wrong";
 
-    const response = await fetch(`${API}${path}`, {
-      ...options,
-      headers,
-    });
-
-    const text = await response.text();
-
-    let body: any = {};
-
-    try {
-      body = text ? JSON.parse(text) : {};
-    } catch {
-      body = {
-        message: text,
-      };
-    }
-
-    if (!response.ok) {
-      let message = "Something went wrong";
-
-      if (typeof body?.detail === "string") {
-        message = body.detail;
-      } else if (body?.detail?.message) {
-        message = body.detail.message;
-      } else if (Array.isArray(body?.detail?.errors)) {
-        message = body.detail.errors
+    if (typeof body?.detail === "string") {
+      message = body.detail;
+    } else if (body?.detail?.message) {
+      message = body.detail.message;
+    } else if (Array.isArray(body?.detail?.errors)) {
+      message = body.detail.errors
         .map(
           (error: any) =>
-          `Row ${error?.row ?? "?"}: ${error?.problem ?? "Validation error"
-          }`,
+            `Row ${error?.row ?? "?"}: ${error?.problem ?? "Validation error"
+            }`,
         )
         .join("\n");
-      } else if (body?.detail) {
-        message = JSON.stringify(
-          body.detail,
-          null,
-          2,
-        );
-      } else if (body?.message) {
-        message = body.message;
-      }
-
-      throw new ApiError(
-        response.status,
-        `${response.status}: ${message}`,
-        body,
+    } else if (body?.detail) {
+      message = JSON.stringify(
+        body.detail,
+        null,
+        2,
       );
+    } else if (body?.message) {
+      message = body.message;
     }
 
-    return body;
+    throw new ApiError(
+      response.status,
+      `${response.status}: ${message}`,
+      body,
+    );
   }
 
-  /* ============================================================
-   *   A NALYSIS API* TYPES
-   *   ============================================================ */
+  return body;
+}
 
-  // Analysis summary returned by the backend
-  type AnalysisSummary = {
-    dataset_id: string;
-    record_count: number;
-    average_hpi: number | null;
-    average_hei: number | null;
-    average_cd: number | null;
-    max_hpi: number | null;
-    min_hpi: number | null;
-    overall_status: string;
-    high_samples: number;
-    moderate_samples: number;
-    low_samples: number;
-    safe_samples: number;
-    quality_score: number | null;
-  };
+/* ============================================================
+ *   A NALYSIS API* TYPES
+ *   ============================================================ */
 
-  // Metal-level results returned by the backend
-  type MetalAnalysis = {
-    metal: string;
-    sample_count: number;
-    average_measured: number | null;
-    maximum_measured: number | null;
-    average_ratio: number | null;
-    maximum_exceedance: number | null;
-    high_samples: number;
-  };
+// Analysis summary returned by the backend
+type AnalysisSummary = {
+  dataset_id: string;
+  record_count: number;
+  average_hpi: number | null;
+  average_hei: number | null;
+  average_cd: number | null;
+  max_hpi: number | null;
+  min_hpi: number | null;
+  overall_status: string;
+  high_samples: number;
+  moderate_samples: number;
+  low_samples: number;
+  safe_samples: number;
+  quality_score: number | null;
+};
 
-  // Location data used by the pollution map
-  type SpatialPoint = {
-    sample_id: string;
+// Metal-level results returned by the backend
+type MetalAnalysis = {
+  metal: string;
+  sample_count: number;
+  average_measured: number | null;
+  maximum_measured: number | null;
+  average_ratio: number | null;
+  maximum_exceedance: number | null;
+  high_samples: number;
+};
+
+// Location data used by the pollution map
+type SpatialPoint = {
+  sample_id: string;
+  latitude: number;
+  longitude: number;
+  country?: string;
+  region?: string;
+  area?: string;
+  water_body?: string;
+  water_type?: string;
+  date?: string | null;
+  hpi?: number | null;
+  hei?: number | null;
+  cd?: number | null;
+  status?: string;
+  highest_metal?: string | null;
+  standard?: string;
+  authority?: string;
+};
+
+type SpatialResponse = {
+  dataset_id: string;
+  points: SpatialPoint[];
+  count: number;
+};
+
+type MapPoint = SpatialPoint & {
+  risk_score?: number;
+};
+
+type MapPointsResponse = {
+  dataset_id: string;
+  points: MapPoint[];
+  count: number;
+};
+
+type MapSummary = {
+  dataset_id: string;
+  count: number;
+  high_risk_count: number;
+  moderate_count: number;
+  low_risk_count: number;
+  safe_count: number;
+  center?: {
     latitude: number;
     longitude: number;
-    country?: string;
-    region?: string;
-    area?: string;
-    water_body?: string;
-    water_type?: string;
-    date?: string | null;
-    hpi?: number | null;
-    hei?: number | null;
-    cd?: number | null;
-    status?: string;
-    highest_metal?: string | null;
-    standard?: string;
-    authority?: string;
+  } | null;
+  bounds?: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+  } | null;
+};
+
+type MapHotspot = {
+  hotspot_id: string;
+  center: {
+    latitude: number;
+    longitude: number;
   };
+  sample_count: number;
+  samples: string[];
+  max_risk_score: number;
+  average_hpi: number | null;
+  radius_km: number;
+};
 
-  type SpatialResponse = {
-    dataset_id: string;
-    points: SpatialPoint[];
-    count: number;
-  };
+type MapHotspotsResponse = {
+  dataset_id: string;
+  radius_km: number;
+  hotspots: MapHotspot[];
+  count: number;
+};
 
-  type MapPoint = SpatialPoint & {
-    risk_score?: number;
-  };
+/* ============================================================
+ *   H ELPERS     *
+ *   ============================================================ */
 
-  type MapPointsResponse = {
-    dataset_id: string;
-    points: MapPoint[];
-    count: number;
-  };
+function initials(name = "") {
+  return (
+    name.trim().charAt(0).toUpperCase() || "U"
+  );
+}
 
-  type MapSummary = {
-    dataset_id: string;
-    count: number;
-    high_risk_count: number;
-    moderate_count: number;
-    low_risk_count: number;
-    safe_count: number;
-    center?: {
-      latitude: number;
-      longitude: number;
-    } | null;
-    bounds?: {
-      north: number;
-      south: number;
-      east: number;
-      west: number;
-    } | null;
-  };
-
-  type MapHotspot = {
-    hotspot_id: string;
-    center: {
-      latitude: number;
-      longitude: number;
-    };
-    sample_count: number;
-    samples: string[];
-    max_risk_score: number;
-    average_hpi: number | null;
-    radius_km: number;
-  };
-
-  type MapHotspotsResponse = {
-    dataset_id: string;
-    radius_km: number;
-    hotspots: MapHotspot[];
-    count: number;
-  };
-
-  /* ============================================================
-   *   H ELPERS     *
-   *   ============================================================ */
-
-  function initials(name = "") {
-    return (
-      name.trim().charAt(0).toUpperCase() || "U"
-    );
+function prettyDate(value?: string) {
+  if (!value) {
+    return "Not provided";
   }
 
-  function prettyDate(value?: string) {
-    if (!value) {
-      return "Not provided";
-    }
+  const date = new Date(value);
 
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return value;
-    }
-
-    return date.toLocaleDateString();
+  if (Number.isNaN(date.getTime())) {
+    return value;
   }
 
-  function firstNumber(
-    row: Record<string, any>,
-    names: string[],
-  ) {
-    for (const name of names) {
-      const key = Object.keys(row).find(
-        (k) =>
+  return date.toLocaleDateString();
+}
+
+function firstNumber(
+  row: Record<string, any>,
+  names: string[],
+) {
+  for (const name of names) {
+    const key = Object.keys(row).find(
+      (k) =>
         k
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, "") ===
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, "") ===
         name
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, ""),
-      );
+          .toLowerCase()
+          .replace(/[^a-z0-9]/g, ""),
+    );
 
-      if (
-        key != null &&
-        row[key] !== "" &&
-        row[key] != null
-      ) {
-        const value = Number(row[key]);
+    if (
+      key != null &&
+      row[key] !== "" &&
+      row[key] != null
+    ) {
+      const value = Number(row[key]);
 
-        if (Number.isFinite(value)) {
-          return value;
-        }
+      if (Number.isFinite(value)) {
+        return value;
       }
     }
-
-    return 0;
   }
 
-  function statusColor(status: string) {
-    const normalized =
+  return 0;
+}
+
+function statusColor(status: string) {
+  const normalized =
     String(status || "UNKNOWN").toUpperCase();
 
-    if (
-      normalized === "HIGH" ||
-      normalized === "CRITICAL"
-    ) {
-      return C.high;
-    }
-
-    if (normalized === "MODERATE") {
-      return C.warning;
-    }
-
-    if (
-      normalized === "LOW" ||
-      normalized === "SAFE"
-    ) {
-      return C.green;
-    }
-
-    return C.muted;
-  }
-
-  const TEMPLATE_FIELDS = [
-    { key: "Sample_ID", required: true, description: "Unique identifier for the water quality sample." },
-{ key: "Sampling_Date", required: true, description: "Sampling date in YYYY-MM-DD format." },
-{ key: "Season", required: false, description: "Season during which the sample was collected." },
-{ key: "Water_Type", required: true, description: "Type or source of water, such as Groundwater or Surface Water." },
-{ key: "Location_Name", required: true, description: "Human-readable monitoring location name." },
-{ key: "Latitude", required: true, description: "Sampling latitude in decimal degrees." },
-{ key: "Longitude", required: true, description: "Sampling longitude in decimal degrees." },
-{ key: "Intended_Use", required: true, description: "Intended use such as Drinking Water, Irrigation, or Industrial." },
-{ key: "pH", required: true, description: "Measured pH value of the sample." },
-{ key: "Temperature_C", required: false, description: "Water temperature in degrees Celsius." },
-{ key: "Electrical_Conductivity", required: false, description: "Electrical conductivity of the sample." },
-{ key: "TDS_mg_L", required: false, description: "Total dissolved solids concentration in mg/L." },
-{ key: "Dissolved_Oxygen_mg_L", required: false, description: "Dissolved oxygen concentration in mg/L." },
-{ key: "Turbidity_NTU", required: false, description: "Turbidity measured in NTU." },
-{ key: "Metal_Unit", required: true, description: "Unit used for the heavy-metal concentration columns, for example mg/L." },
-{ key: "Iron_Fe_mg_L", required: false, description: "Iron concentration in mg/L." },
-{ key: "Manganese_Mn_mg_L", required: false, description: "Manganese concentration in mg/L." },
-{ key: "Copper_Cu_mg_L", required: false, description: "Copper concentration in mg/L." },
-{ key: "Zinc_Zn_mg_L", required: false, description: "Zinc concentration in mg/L." },
-{ key: "Lead_Pb_mg_L", required: false, description: "Lead concentration in mg/L." },
-{ key: "Cadmium_Cd_mg_L", required: false, description: "Cadmium concentration in mg/L." },
-{ key: "Chromium_Cr_mg_L", required: false, description: "Chromium concentration in mg/L." },
-{ key: "Nickel_Ni_mg_L", required: false, description: "Nickel concentration in mg/L." },
-{ key: "Arsenic_As_mg_L", required: false, description: "Arsenic concentration in mg/L." },
-{ key: "Mercury_Hg_mg_L", required: false, description: "Mercury concentration in mg/L." },
-{ key: "Remarks", required: false, description: "Optional observations, laboratory notes, or sample remarks." },
-  ];
-
-  const TEMPLATE_SAMPLE_ROW = [
-    "WQ001",
-"2025-01-15",
-"Winter",
-"Groundwater",
-"Kalyan Station Well",
-"19.2437",
-"73.1305",
-"Drinking Water",
-"7.2",
-"28.5",
-"420",
-"250",
-"6.8",
-"3.1",
-"mg/L",
-"0.15",
-"0.03",
-"0.02",
-"0.08",
-"0.001",
-"0.0005",
-"0.004",
-"0.006",
-"0.002",
-"0.0001",
-"Sample within permissible limits",
-  ];
-
-  const TEMPLATE_HEADERS = TEMPLATE_FIELDS.map((field) => field.key);
-
-  const SUPPORTED_METALS = [
-    "Pb",
-"Cd",
-"As",
-"Cr",
-"Hg",
-"Ni",
-"Cu",
-"Zn",
-"Fe",
-"Mn",
-  ];
-
-  function normaliseKey(value = "") {
-    return value.toLowerCase().replace(/[^a-z0-9]/g, "");
-  }
-
-  function findField(
-    row: Record<string, any>,
-    names: string[],
+  if (
+    normalized === "HIGH" ||
+    normalized === "CRITICAL"
   ) {
-    const wanted = names.map(normaliseKey);
-    const key = Object.keys(row).find((candidate) =>
+    return C.high;
+  }
+
+  if (normalized === "MODERATE") {
+    return C.warning;
+  }
+
+  if (
+    normalized === "LOW" ||
+    normalized === "SAFE"
+  ) {
+    return C.green;
+  }
+
+  return C.muted;
+}
+
+const TEMPLATE_FIELDS = [
+  { key: "Sample_ID", required: true, description: "Unique identifier for the water quality sample." },
+  { key: "Sampling_Date", required: true, description: "Sampling date in YYYY-MM-DD format." },
+  { key: "Season", required: false, description: "Season during which the sample was collected." },
+  { key: "Water_Type", required: true, description: "Type or source of water, such as Groundwater or Surface Water." },
+  { key: "Location_Name", required: true, description: "Human-readable monitoring location name." },
+  { key: "Latitude", required: true, description: "Sampling latitude in decimal degrees." },
+  { key: "Longitude", required: true, description: "Sampling longitude in decimal degrees." },
+  { key: "Intended_Use", required: true, description: "Intended use such as Drinking Water, Irrigation, or Industrial." },
+  { key: "pH", required: true, description: "Measured pH value of the sample." },
+  { key: "Temperature_C", required: false, description: "Water temperature in degrees Celsius." },
+  { key: "Electrical_Conductivity", required: false, description: "Electrical conductivity of the sample." },
+  { key: "TDS_mg_L", required: false, description: "Total dissolved solids concentration in mg/L." },
+  { key: "Dissolved_Oxygen_mg_L", required: false, description: "Dissolved oxygen concentration in mg/L." },
+  { key: "Turbidity_NTU", required: false, description: "Turbidity measured in NTU." },
+  { key: "Metal_Unit", required: true, description: "Unit used for the heavy-metal concentration columns, for example mg/L." },
+  { key: "Iron_Fe_mg_L", required: false, description: "Iron concentration in mg/L." },
+  { key: "Manganese_Mn_mg_L", required: false, description: "Manganese concentration in mg/L." },
+  { key: "Copper_Cu_mg_L", required: false, description: "Copper concentration in mg/L." },
+  { key: "Zinc_Zn_mg_L", required: false, description: "Zinc concentration in mg/L." },
+  { key: "Lead_Pb_mg_L", required: false, description: "Lead concentration in mg/L." },
+  { key: "Cadmium_Cd_mg_L", required: false, description: "Cadmium concentration in mg/L." },
+  { key: "Chromium_Cr_mg_L", required: false, description: "Chromium concentration in mg/L." },
+  { key: "Nickel_Ni_mg_L", required: false, description: "Nickel concentration in mg/L." },
+  { key: "Arsenic_As_mg_L", required: false, description: "Arsenic concentration in mg/L." },
+  { key: "Mercury_Hg_mg_L", required: false, description: "Mercury concentration in mg/L." },
+  { key: "Remarks", required: false, description: "Optional observations, laboratory notes, or sample remarks." },
+];
+
+const TEMPLATE_SAMPLE_ROW = [
+  "WQ001",
+  "2025-01-15",
+  "Winter",
+  "Groundwater",
+  "Kalyan Station Well",
+  "19.2437",
+  "73.1305",
+  "Drinking Water",
+  "7.2",
+  "28.5",
+  "420",
+  "250",
+  "6.8",
+  "3.1",
+  "mg/L",
+  "0.15",
+  "0.03",
+  "0.02",
+  "0.08",
+  "0.001",
+  "0.0005",
+  "0.004",
+  "0.006",
+  "0.002",
+  "0.0001",
+  "Sample within permissible limits",
+];
+
+const TEMPLATE_HEADERS = TEMPLATE_FIELDS.map((field) => field.key);
+
+const SUPPORTED_METALS = [
+  "Pb",
+  "Cd",
+  "As",
+  "Cr",
+  "Hg",
+  "Ni",
+  "Cu",
+  "Zn",
+  "Fe",
+  "Mn",
+];
+
+function normaliseKey(value = "") {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function findField(
+  row: Record<string, any>,
+  names: string[],
+) {
+  const wanted = names.map(normaliseKey);
+  const key = Object.keys(row).find((candidate) =>
     wanted.includes(normaliseKey(candidate)),
-    );
-    return key ? row[key] : undefined;
-  }
+  );
+  return key ? row[key] : undefined;
+}
 
-  function sampleIdFor(
-    row: Record<string, any>,
-    index: number,
-  ) {
-    return String(
-      findField(row, ["sample_id", "sample", "id"]) ||
-      `S${String(index + 1).padStart(3, "0")}`,
-    );
-  }
+function sampleIdFor(
+  row: Record<string, any>,
+  index: number,
+) {
+  return String(
+    findField(row, ["sample_id", "sample", "id"]) ||
+    `S${String(index + 1).padStart(3, "0")}`,
+  );
+}
 
-  function sampleDateFor(row: Record<string, any>) {
-    return findField(row, [
-      "date",
-      "sample_date",
-      "sampleDate",
-      "datetime",
-      "date_time",
-      "timestamp",
-    ]);
-  }
+function sampleDateFor(row: Record<string, any>) {
+  return findField(row, [
+    "date",
+    "sample_date",
+    "sampleDate",
+    "datetime",
+    "date_time",
+    "timestamp",
+  ]);
+}
 
-  function metalKeysFor(row: Record<string, any>) {
-    return Object.keys(row).filter((key) =>
+function metalKeysFor(row: Record<string, any>) {
+  return Object.keys(row).filter((key) =>
     SUPPORTED_METALS.some(
       (metal) =>
-      normaliseKey(key) === normaliseKey(metal),
+        normaliseKey(key) === normaliseKey(metal),
     ),
-    );
-  }
+  );
+}
 
-  function rowLabel(
-    row: Record<string, any>,
-    names: string[],
-  ) {
-    const value = findField(row, names);
-    return value == null || value === ""
+function rowLabel(
+  row: Record<string, any>,
+  names: string[],
+) {
+  const value = findField(row, names);
+  return value == null || value === ""
     ? ""
     : String(value);
-  }
+}
 
-  function getQualityChecks(dataset?: Dataset) {
-    const records = dataset?.records || [];
-    const quality = dataset?.quality || {};
-    const ids = records.map(sampleIdFor);
-    const seen = new Set<string>();
-    const duplicateIds = new Set<string>();
+function getQualityChecks(dataset?: Dataset) {
+  const records = dataset?.records || [];
+  const quality = dataset?.quality || {};
+  const ids = records.map(sampleIdFor);
+  const seen = new Set<string>();
+  const duplicateIds = new Set<string>();
 
-    ids.forEach((id) => {
-      if (seen.has(id)) duplicateIds.add(id);
-      seen.add(id);
-    });
+  ids.forEach((id) => {
+    if (seen.has(id)) duplicateIds.add(id);
+    seen.add(id);
+  });
 
-    let missingValues = 0;
-    let invalidUnits = 0;
-    let invalidCoordinates = 0;
-    let missingDates = 0;
-    const numericValues: number[] = [];
-    const rowNumericValues: number[][] = [];
+  let missingValues = 0;
+  let invalidUnits = 0;
+  let invalidCoordinates = 0;
+  let missingDates = 0;
+  const numericValues: number[] = [];
+  const rowNumericValues: number[][] = [];
 
-    records.forEach((row) => {
-      const lat = findField(row, ["latitude", "lat"]);
-      const lon = findField(row, ["longitude", "lon", "lng"]);
-      const metals = metalKeysFor(row);
-      const hasMetal = metals.some(
-        (key) =>
+  records.forEach((row) => {
+    const lat = findField(row, ["latitude", "lat"]);
+    const lon = findField(row, ["longitude", "lon", "lng"]);
+    const metals = metalKeysFor(row);
+    const hasMetal = metals.some(
+      (key) =>
         row[key] !== "" &&
         row[key] != null &&
         Number.isFinite(Number(row[key])),
-      );
+    );
 
-      if (
-        lat === "" ||
-        lat == null ||
-        lon === "" ||
-        lon == null ||
-        !Number.isFinite(Number(lat)) ||
-        !Number.isFinite(Number(lon))
-      ) {
-        invalidCoordinates += 1;
+    if (
+      lat === "" ||
+      lat == null ||
+      lon === "" ||
+      lon == null ||
+      !Number.isFinite(Number(lat)) ||
+      !Number.isFinite(Number(lon))
+    ) {
+      invalidCoordinates += 1;
+    }
+
+    if (!hasMetal) {
+      missingValues += 1;
+    }
+
+    const date = sampleDateFor(row);
+    if (date === "" || date == null) {
+      missingDates += 1;
+    }
+
+    const rowValues: number[] = [];
+    metals.forEach((key) => {
+      const raw = row[key];
+      if (raw === "" || raw == null) return;
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0) {
+        invalidUnits += 1;
+      } else {
+        numericValues.push(value);
+        rowValues.push(value);
       }
-
-      if (!hasMetal) {
-        missingValues += 1;
-      }
-
-      const date = sampleDateFor(row);
-      if (date === "" || date == null) {
-        missingDates += 1;
-      }
-
-      const rowValues: number[] = [];
-      metals.forEach((key) => {
-        const raw = row[key];
-        if (raw === "" || raw == null) return;
-        const value = Number(raw);
-        if (!Number.isFinite(value) || value < 0) {
-          invalidUnits += 1;
-        } else {
-          numericValues.push(value);
-          rowValues.push(value);
-        }
-      });
-      rowNumericValues.push(rowValues);
     });
+    rowNumericValues.push(rowValues);
+  });
 
-    const mean =
+  const mean =
     numericValues.length > 0
-    ? numericValues.reduce((sum, value) => sum + value, 0) /
-    numericValues.length
-    : 0;
-    const variance =
+      ? numericValues.reduce((sum, value) => sum + value, 0) /
+      numericValues.length
+      : 0;
+  const variance =
     numericValues.length > 1
-    ? numericValues.reduce(
-      (sum, value) => sum + Math.pow(value - mean, 2),
-                           0,
-    ) / numericValues.length
-    : 0;
-    const std = Math.sqrt(variance);
+      ? numericValues.reduce(
+        (sum, value) => sum + Math.pow(value - mean, 2),
+        0,
+      ) / numericValues.length
+      : 0;
+  const std = Math.sqrt(variance);
 
-    let outliers = 0;
-    if (std > 0) {
-      outliers = rowNumericValues.filter((values) =>
+  let outliers = 0;
+  if (std > 0) {
+    outliers = rowNumericValues.filter((values) =>
       values.some(
         (value) => Math.abs(value - mean) / std > 2,
       ),
-      ).length;
-    }
-
-    const countOrFallback = (
-      value: any,
-      fallback: number,
-    ) =>
-    Number.isFinite(Number(value))
-    ? Number(value)
-    : fallback;
-
-    return [
-      {
-        label: "Missing values",
-        count: countOrFallback(
-          quality.missing,
-          missingValues,
-        ),
-        icon: "remove-circle-outline" as keyof typeof Ionicons.glyphMap,
-      },
-      {
-        label: "Invalid / out-of-range units",
-        count: invalidUnits,
-        icon: "flask-outline" as keyof typeof Ionicons.glyphMap,
-      },
-      {
-        label: "Duplicate sample IDs",
-        count: countOrFallback(
-          quality.duplicates,
-          duplicateIds.size,
-        ),
-        icon: "copy-outline" as keyof typeof Ionicons.glyphMap,
-      },
-      {
-        label: "Invalid or missing coordinates",
-        count: countOrFallback(
-          quality.coordinate_issues,
-          invalidCoordinates,
-        ),
-        icon: "navigate-outline" as keyof typeof Ionicons.glyphMap,
-      },
-      {
-        label: "Missing sample dates",
-        count: missingDates,
-        icon: "calendar-outline" as keyof typeof Ionicons.glyphMap,
-      },
-      {
-        label: "Statistical outliers (z-score > 2σ)",
-        count: outliers,
-        icon: "stats-chart-outline" as keyof typeof Ionicons.glyphMap,
-      },
-    ];
+    ).length;
   }
 
-  /* ============================================================
-   *   B ACKEND ANAL*YSIS DATA
-   *   ============================================================ */
+  const countOrFallback = (
+    value: any,
+    fallback: number,
+  ) =>
+    Number.isFinite(Number(value))
+      ? Number(value)
+      : fallback;
 
-  function sampleMetrics(dataset?: Dataset) {
-    if (!dataset) {
-      return [];
-    }
+  return [
+    {
+      label: "Missing values",
+      count: countOrFallback(
+        quality.missing,
+        missingValues,
+      ),
+      icon: "remove-circle-outline" as keyof typeof Ionicons.glyphMap,
+    },
+    {
+      label: "Invalid / out-of-range units",
+      count: invalidUnits,
+      icon: "flask-outline" as keyof typeof Ionicons.glyphMap,
+    },
+    {
+      label: "Duplicate sample IDs",
+      count: countOrFallback(
+        quality.duplicates,
+        duplicateIds.size,
+      ),
+      icon: "copy-outline" as keyof typeof Ionicons.glyphMap,
+    },
+    {
+      label: "Invalid or missing coordinates",
+      count: countOrFallback(
+        quality.coordinate_issues,
+        invalidCoordinates,
+      ),
+      icon: "navigate-outline" as keyof typeof Ionicons.glyphMap,
+    },
+    {
+      label: "Missing sample dates",
+      count: missingDates,
+      icon: "calendar-outline" as keyof typeof Ionicons.glyphMap,
+    },
+    {
+      label: "Statistical outliers (z-score > 2σ)",
+      count: outliers,
+      icon: "stats-chart-outline" as keyof typeof Ionicons.glyphMap,
+    },
+  ];
+}
 
-    return (dataset.records || []).map(
-      (row, index) => {
-        const analysis =
+/* ============================================================
+ *   B ACKEND ANAL*YSIS DATA
+ *   ============================================================ */
+
+function sampleMetrics(dataset?: Dataset) {
+  if (!dataset) {
+    return [];
+  }
+
+  return (dataset.records || []).map(
+    (row, index) => {
+      const analysis =
         row?.analysis || {};
 
-        const hpi = Number(
-          analysis.hpi,
-        );
+      const hpi = Number(
+        analysis.hpi,
+      );
 
-        const hei = Number(
-          analysis.hei,
-        );
+      const hei = Number(
+        analysis.hei,
+      );
 
-        const cd = Number(
-          analysis.cd,
-        );
+      const cd = Number(
+        analysis.cd,
+      );
 
-        return {
-          row,
+      return {
+        row,
 
-          id: sampleIdFor(row, index),
+        id: sampleIdFor(row, index),
 
-                                       hpi:
-                                       Number.isFinite(hpi)
-                                       ? hpi
-                                       : 0,
+        hpi:
+          Number.isFinite(hpi)
+            ? hpi
+            : 0,
 
-                                       hei:
-                                       Number.isFinite(hei)
-                                       ? hei
-                                       : 0,
+        hei:
+          Number.isFinite(hei)
+            ? hei
+            : 0,
 
-                                       cd:
-                                       Number.isFinite(cd)
-                                       ? cd
-                                       : 0,
+        cd:
+          Number.isFinite(cd)
+            ? cd
+            : 0,
 
-                                       lat:
-                                       firstNumber(
-                                         row,
-                                         ["latitude", "lat"],
-                                       ),
+        lat:
+          firstNumber(
+            row,
+            ["latitude", "lat"],
+          ),
 
-                                       lon:
-                                       firstNumber(
-                                         row,
-                                         [
-                                           "longitude",
-                                           "lon",
-                                           "lng",
-                                         ],
-                                       ),
+        lon:
+          firstNumber(
+            row,
+            [
+              "longitude",
+              "lon",
+              "lng",
+            ],
+          ),
 
-                                       status:
-                                       String(
-                                         analysis.status ||
-                                         "UNKNOWN",
-                                       ).toUpperCase(),
-        };
-      },
-    );
-  }
+        status:
+          String(
+            analysis.status ||
+            "UNKNOWN",
+          ).toUpperCase(),
+      };
+    },
+  );
+}
 
-  /* ============================================================
-   *   R OOT        *
-   *   ============================================================ */
+/* ============================================================
+ *   R OOT        *
+ *   ============================================================ */
 
-  export default function Index() {
-    const [
-      token,
-      setToken,
-    ] = useState<string | null>(null);
+export default function Index() {
+  const [
+    token,
+    setToken,
+  ] = useState<string | null>(null);
 
-    const [
-      user,
-      setUser,
-    ] = useState<User | null>(null);
+  const [
+    user,
+    setUser,
+  ] = useState<User | null>(null);
 
-    const [
-      datasets,
-      setDatasets,
-    ] = useState<Dataset[]>([]);
+  const [
+    datasets,
+    setDatasets,
+  ] = useState<Dataset[]>([]);
 
-    const [
-      page,
-      setPage,
-    ] = useState<Page>("dashboard");
+  const [
+    page,
+    setPage,
+  ] = useState<Page>("dashboard");
 
-    const [
-      authMode,
-      setAuthMode,
-    ] = useState<
+  const [
+    authMode,
+    setAuthMode,
+  ] = useState<
     "login" | "signup"
-    >("login");
+  >("login");
 
-    const [
-      loading,
-      setLoading,
-    ] = useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-    const [
-      isDark,
-      setIsDark,
-    ] = useState(false);
+  const [
+    isDark,
+    setIsDark,
+  ] = useState(false);
 
-    const toggleTheme = () => {
-      const next = !isDark;
-      C = next ? DARK_C : LIGHT_C;
-      styles = createStyles();
-      setIsDark(next);
-    };
+  const toggleTheme = () => {
+    const next = !isDark;
+    C = next ? DARK_C : LIGHT_C;
+    styles = createStyles();
+    setIsDark(next);
+  };
 
-    useEffect(() => {
-      let mounted = true;
+  useEffect(() => {
+    let mounted = true;
 
-      AsyncStorage.multiGet([
-        "ms_token",
-        "ms_user",
-      ])
+    AsyncStorage.multiGet([
+      "ms_token",
+      "ms_user",
+    ])
       .then(
         ([tokenItem, userItem]) => {
           if (!mounted) {
@@ -868,10 +868,10 @@ process.env.EXPO_BACKEND_URL ||
           }
 
           const savedToken =
-          tokenItem?.[1];
+            tokenItem?.[1];
 
           const savedUser =
-          userItem?.[1];
+            userItem?.[1];
 
           if (
             savedToken &&
@@ -907,109 +907,109 @@ process.env.EXPO_BACKEND_URL ||
         }
       });
 
-      return () => {
-        mounted = false;
-      };
-    }, []);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-    const refresh = async (
-      currentToken = token,
-    ) => {
-      if (!currentToken) {
-        return;
-      }
+  const refresh = async (
+    currentToken = token,
+  ) => {
+    if (!currentToken) {
+      return;
+    }
 
-      try {
-        const data = await api(
-          "/datasets",
-          {},
-          currentToken,
-        );
+    try {
+      const data = await api(
+        "/datasets",
+        {},
+        currentToken,
+      );
 
-        setDatasets(
-          Array.isArray(data)
+      setDatasets(
+        Array.isArray(data)
           ? data
           : data?.datasets || [],
-        );
-      } catch {
-        await signOut();
-      }
-    };
-
-    useEffect(() => {
-      if (token) {
-        refresh(token);
-      }
-    }, [token]);
-
-    const signIn = async (
-      result: any,
-    ) => {
-      if (
-        !result?.token ||
-        !result?.user
-      ) {
-        throw new Error(
-          "The server returned an invalid login response.",
-        );
-      }
-
-      setToken(
-        result.token,
       );
+    } catch {
+      await signOut();
+    }
+  };
 
-      setUser(
-        result.user,
-      );
+  useEffect(() => {
+    if (token) {
+      refresh(token);
+    }
+  }, [token]);
 
-      setPage("dashboard");
-
-      await AsyncStorage.multiSet([
-        [
-          "ms_token",
-          result.token,
-        ],
-        [
-          "ms_user",
-          JSON.stringify(
-            result.user,
-          ),
-        ],
-      ]);
-    };
-
-    const signOut = async () => {
-      setToken(null);
-      setUser(null);
-      setDatasets([]);
-      setPage("dashboard");
-
-      await AsyncStorage.multiRemove([
-        "ms_token",
-        "ms_user",
-      ]);
-    };
-
-    if (loading) {
-      return (
-        <View
-        style={
-          styles.center
-        }
-        >
-        <ActivityIndicator
-        color={
-          C.green
-        }
-        size="large"
-        />
-        </View>
+  const signIn = async (
+    result: any,
+  ) => {
+    if (
+      !result?.token ||
+      !result?.user
+    ) {
+      throw new Error(
+        "The server returned an invalid login response.",
       );
     }
 
-    if (!token || !user) {
-      return (
-        <Auth
+    setToken(
+      result.token,
+    );
+
+    setUser(
+      result.user,
+    );
+
+    setPage("dashboard");
+
+    await AsyncStorage.multiSet([
+      [
+        "ms_token",
+        result.token,
+      ],
+      [
+        "ms_user",
+        JSON.stringify(
+          result.user,
+        ),
+      ],
+    ]);
+  };
+
+  const signOut = async () => {
+    setToken(null);
+    setUser(null);
+    setDatasets([]);
+    setPage("dashboard");
+
+    await AsyncStorage.multiRemove([
+      "ms_token",
+      "ms_user",
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <View
+        style={
+          styles.center
+        }
+      >
+        <ActivityIndicator
+          color={
+            C.green
+          }
+          size="large"
+        />
+      </View>
+    );
+  }
+
+  if (!token || !user) {
+    return (
+      <Auth
         mode={
           authMode
         }
@@ -1025,15 +1025,15 @@ process.env.EXPO_BACKEND_URL ||
         toggleTheme={
           toggleTheme
         }
-        />
-      );
-    }
+      />
+    );
+  }
 
-    const activeDataset =
+  const activeDataset =
     datasets[0];
 
-    return (
-      <AppShell
+  return (
+    <AppShell
       page={page}
       setPage={setPage}
       user={user}
@@ -1056,474 +1056,474 @@ process.env.EXPO_BACKEND_URL ||
       toggleTheme={
         toggleTheme
       }
-      />
-    );
-  }
+    />
+  );
+}
 
-  /* ============================================================
-   *   A UTH        *
-   *   ============================================================ */
+/* ============================================================
+ *   A UTH        *
+ *   ============================================================ */
 
-  function Auth({
-    mode,
-    setMode,
-    onSuccess,
-    isDark,
-    toggleTheme,
-  }: {
-    mode:
-    | "login"
-    | "signup";
+function Auth({
+  mode,
+  setMode,
+  onSuccess,
+  isDark,
+  toggleTheme,
+}: {
+  mode:
+  | "login"
+  | "signup";
 
-    setMode: (
-      value:
+  setMode: (
+    value:
       | "login"
       | "signup",
-    ) => void;
+  ) => void;
 
-    onSuccess: (
-      value: any,
-    ) => Promise<void>;
+  onSuccess: (
+    value: any,
+  ) => Promise<void>;
 
-    isDark: boolean;
-    toggleTheme: () => void;
-  }) {
-    const [
-      form,
-        setForm,
-    ] = useState<
+  isDark: boolean;
+  toggleTheme: () => void;
+}) {
+  const [
+    form,
+    setForm,
+  ] = useState<
     Record<string, string>
-    >({});
+  >({});
 
-    const [
-      busy,
-      setBusy,
-    ] = useState(false);
+  const [
+    busy,
+    setBusy,
+  ] = useState(false);
 
-    const [
-      show,
-      setShow,
-    ] = useState(false);
+  const [
+    show,
+    setShow,
+  ] = useState(false);
 
-    const [
-      error,
-      setError,
-    ] = useState("");
+  const [
+    error,
+    setError,
+  ] = useState("");
 
-    const update = (
-      key: string,
-      value: string,
-    ) => {
-      setForm(
-        (old) => ({
-          ...old,
-          [key]: value,
-        }),
-      );
-    };
+  const update = (
+    key: string,
+    value: string,
+  ) => {
+    setForm(
+      (old) => ({
+        ...old,
+        [key]: value,
+      }),
+    );
+  };
 
-    const submit = async () => {
-      setError("");
+  const submit = async () => {
+    setError("");
 
-      if (
-        !form.email ||
-        !form.password ||
-        (
-          mode === "signup" &&
-          (
-            !form.full_name ||
-            !form.role ||
-            !form.account_type
-          )
-        )
-      ) {
-        setError(
-          "Complete all required fields.",
-        );
-
-        return;
-      }
-
-      if (
+    if (
+      !form.email ||
+      !form.password ||
+      (
         mode === "signup" &&
-        form.password !==
-          form.confirm
-      ) {
-        setError(
-          "Passwords do not match.",
-        );
+        (
+          !form.full_name ||
+          !form.role ||
+          !form.account_type
+        )
+      )
+    ) {
+      setError(
+        "Complete all required fields.",
+      );
 
-        return;
-      }
+      return;
+    }
 
-      setBusy(true);
+    if (
+      mode === "signup" &&
+      form.password !==
+      form.confirm
+    ) {
+      setError(
+        "Passwords do not match.",
+      );
 
-      try {
-        const result =
+      return;
+    }
+
+    setBusy(true);
+
+    try {
+      const result =
         await api(
           mode === "login"
-          ? "/auth/login"
-          : "/auth/signup",
+            ? "/auth/login"
+            : "/auth/signup",
           {
             method:
-            "POST",
+              "POST",
             headers: {
               "Content-Type":
-              "application/json",
+                "application/json",
             },
             body:
-            JSON.stringify({
-              ...form,
+              JSON.stringify({
+                ...form,
 
-              organization:
-              form.organization ||
-                "",
-
-                institution:
-                form.institution ||
+                organization:
+                  form.organization ||
                   "",
 
-                  research_area:
+                institution:
+                  form.institution ||
+                  "",
+
+                research_area:
                   form.research_area ||
-                    "",
-            }),
+                  "",
+              }),
           },
         );
 
-        await onSuccess(
-          result,
-        );
-      } catch (
-        error: any
-      ) {
-        setError(
-          error?.message ||
-          "Unable to continue.",
-        );
-      } finally {
-        setBusy(false);
-      }
-    };
+      await onSuccess(
+        result,
+      );
+    } catch (
+    error: any
+    ) {
+      setError(
+        error?.message ||
+        "Unable to continue.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
 
-    return (
-      <KeyboardAvoidingView
+  return (
+    <KeyboardAvoidingView
       style={
         styles.authWrap
       }
       behavior={
         Platform.OS ===
-        "ios"
-        ? "padding"
-        : undefined
+          "ios"
+          ? "padding"
+          : undefined
       }
-      >
+    >
       <ScrollView
-      contentContainerStyle={
-        styles.authScroll
-      }
-      keyboardShouldPersistTaps="handled"
-      >
-      <View
-      style={
-        styles.brand
-      }
-      >
-      <Image
-      source={require("../metalsense.png")}
-      style={styles.sidebarLogo}
-      />
-
-      <Text
-      style={
-        styles.brandName
-      }
-      >
-      MetalSense
-      </Text>
-
-      <Text
-      style={
-        styles.tagline
-      }
-      >
-      Heavy Metal Pollution
-      Intelligence
-      </Text>
-      </View>
-
-      <Pressable
-      onPress={toggleTheme}
-      style={styles.authThemeToggle}
-      >
-      <Ionicons
-      name={isDark ? "sunny-outline" : "moon-outline"}
-      size={17}
-      color={C.teal}
-      />
-      <Text style={styles.authThemeToggleText}>
-      {isDark ? "Light mode" : "Dark mode"}
-      </Text>
-      </Pressable>
-
-      <View
-      style={
-        styles.authCard
-      }
-      >
-      <Text
-      style={
-        styles.eyebrow
-      }
-      >
-      SECURE WORKSPACE
-      </Text>
-
-      <Text
-      style={
-        styles.h1
-      }
-      >
-      {mode ===
-        "login"
-        ? "Welcome back"
-        : "Create your account"}
-        </Text>
-
-        <Text
-        style={
-          styles.sub
+        contentContainerStyle={
+          styles.authScroll
         }
+        keyboardShouldPersistTaps="handled"
+      >
+        <View
+          style={
+            styles.brand
+          }
         >
-        {mode ===
-          "login"
-          ? "Continue to your water quality intelligence workspace."
-          : "Set up a professional workspace for traceable analysis."}
+          <Image
+            source={require("../metalsense.png")}
+            style={styles.sidebarLogo}
+          />
+
+          <Text
+            style={
+              styles.brandName
+            }
+          >
+            MetalSense
+          </Text>
+
+          <Text
+            style={
+              styles.tagline
+            }
+          >
+            Heavy Metal Pollution
+            Intelligence
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={toggleTheme}
+          style={styles.authThemeToggle}
+        >
+          <Ionicons
+            name={isDark ? "sunny-outline" : "moon-outline"}
+            size={17}
+            color={C.teal}
+          />
+          <Text style={styles.authThemeToggleText}>
+            {isDark ? "Light mode" : "Dark mode"}
+          </Text>
+        </Pressable>
+
+        <View
+          style={
+            styles.authCard
+          }
+        >
+          <Text
+            style={
+              styles.eyebrow
+            }
+          >
+            SECURE WORKSPACE
+          </Text>
+
+          <Text
+            style={
+              styles.h1
+            }
+          >
+            {mode ===
+              "login"
+              ? "Welcome back"
+              : "Create your account"}
+          </Text>
+
+          <Text
+            style={
+              styles.sub
+            }
+          >
+            {mode ===
+              "login"
+              ? "Continue to your water quality intelligence workspace."
+              : "Set up a professional workspace for traceable analysis."}
           </Text>
 
           {mode ===
             "signup" && (
               <>
-              <Field
-              label="FULL NAME *"
-              value={
-                form.full_name ||
-                  ""
-              }
-              onChangeText={(
-                value,
-              ) =>
-              update(
-                "full_name",
-                value,
-              )
-              }
-              placeholder="Your name"
-              />
+                <Field
+                  label="FULL NAME *"
+                  value={
+                    form.full_name ||
+                    ""
+                  }
+                  onChangeText={(
+                    value,
+                  ) =>
+                    update(
+                      "full_name",
+                      value,
+                    )
+                  }
+                  placeholder="Your name"
+                />
 
-              <Field
-              label="ACCOUNT TYPE *"
-              value={
-                form.account_type ||
-                  ""
-              }
-              onChangeText={(
-                value,
-              ) =>
-              update(
-                "account_type",
-                value,
-              )
-              }
-              placeholder="Student / Researcher / Organization"
-              />
+                <Field
+                  label="ACCOUNT TYPE *"
+                  value={
+                    form.account_type ||
+                    ""
+                  }
+                  onChangeText={(
+                    value,
+                  ) =>
+                    update(
+                      "account_type",
+                      value,
+                    )
+                  }
+                  placeholder="Student / Researcher / Organization"
+                />
 
-              <Field
-              label="ROLE *"
-              value={
-                form.role ||
-                  ""
-              }
-              onChangeText={(
-                value,
-              ) =>
-              update(
-                "role",
-                value,
-              )
-              }
-              placeholder="analyst"
-              />
+                <Field
+                  label="ROLE *"
+                  value={
+                    form.role ||
+                    ""
+                  }
+                  onChangeText={(
+                    value,
+                  ) =>
+                    update(
+                      "role",
+                      value,
+                    )
+                  }
+                  placeholder="analyst"
+                />
 
-              <Field
-              label="ORGANIZATION"
-              value={
-                form.organization ||
-                  ""
-              }
-              onChangeText={(
-                value,
-              ) =>
-              update(
-                "organization",
-                value,
-              )
-              }
-              placeholder="Organization"
-              />
+                <Field
+                  label="ORGANIZATION"
+                  value={
+                    form.organization ||
+                    ""
+                  }
+                  onChangeText={(
+                    value,
+                  ) =>
+                    update(
+                      "organization",
+                      value,
+                    )
+                  }
+                  placeholder="Organization"
+                />
 
-              <Field
-              label="INSTITUTION"
-              value={
-                form.institution ||
-                  ""
-              }
-              onChangeText={(
-                value,
-              ) =>
-              update(
-                "institution",
-                value,
-              )
-              }
-              placeholder="Institution"
-              />
+                <Field
+                  label="INSTITUTION"
+                  value={
+                    form.institution ||
+                    ""
+                  }
+                  onChangeText={(
+                    value,
+                  ) =>
+                    update(
+                      "institution",
+                      value,
+                    )
+                  }
+                  placeholder="Institution"
+                />
 
-              <Field
-              label="RESEARCH AREA"
-              value={
-                form.research_area ||
-                  ""
-              }
-              onChangeText={(
-                value,
-              ) =>
-              update(
-                "research_area",
-                value,
-              )
-              }
-              placeholder="Water Quality"
-              />
+                <Field
+                  label="RESEARCH AREA"
+                  value={
+                    form.research_area ||
+                    ""
+                  }
+                  onChangeText={(
+                    value,
+                  ) =>
+                    update(
+                      "research_area",
+                      value,
+                    )
+                  }
+                  placeholder="Water Quality"
+                />
               </>
             )}
 
-            <Field
+          <Field
             label="EMAIL *"
             value={
               form.email ||
-                ""
+              ""
             }
             onChangeText={(
               value,
             ) =>
-            update(
-              "email",
-              value,
-            )
+              update(
+                "email",
+                value,
+              )
             }
             placeholder="you@example.com"
             keyboardType="email-address"
             autoCapitalize="none"
-            />
+          />
 
-            <View>
+          <View>
             <Text
-            style={
-              styles.fieldLabel
-            }
+              style={
+                styles.fieldLabel
+              }
             >
-            PASSWORD *
+              PASSWORD *
             </Text>
 
             <View
-            style={
-              styles.passwordBox
-            }
+              style={
+                styles.passwordBox
+              }
             >
-            <TextInput
-            value={
-              form.password ||
-                ""
-            }
-            onChangeText={(
-              value,
-            ) =>
-            update(
-              "password",
-              value,
-            )
-            }
-            placeholder="Password"
-            placeholderTextColor={
-              C.muted
-            }
-            secureTextEntry={
-              !show
-            }
-            style={
-              styles.passwordInput
-            }
-            autoCapitalize="none"
-            />
-
-            <Pressable
-            onPress={() =>
-              setShow(
-                (old) =>
-                !old,
-              )
-            }
-            >
-            <Ionicons
-            name={
-              show
-              ? "eye-off-outline"
-              : "eye-outline"
-            }
-            size={21}
-            color={
-              C.muted
-            }
-            />
-            </Pressable>
-            </View>
-            </View>
-
-            {mode ===
-              "signup" && (
-                <Field
-                label="CONFIRM PASSWORD *"
+              <TextInput
                 value={
-                  form.confirm ||
-                    ""
+                  form.password ||
+                  ""
                 }
                 onChangeText={(
                   value,
                 ) =>
-                update(
-                  "confirm",
+                  update(
+                    "password",
+                    value,
+                  )
+                }
+                placeholder="Password"
+                placeholderTextColor={
+                  C.muted
+                }
+                secureTextEntry={
+                  !show
+                }
+                style={
+                  styles.passwordInput
+                }
+                autoCapitalize="none"
+              />
+
+              <Pressable
+                onPress={() =>
+                  setShow(
+                    (old) =>
+                      !old,
+                  )
+                }
+              >
+                <Ionicons
+                  name={
+                    show
+                      ? "eye-off-outline"
+                      : "eye-outline"
+                  }
+                  size={21}
+                  color={
+                    C.muted
+                  }
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {mode ===
+            "signup" && (
+              <Field
+                label="CONFIRM PASSWORD *"
+                value={
+                  form.confirm ||
+                  ""
+                }
+                onChangeText={(
                   value,
-                )
+                ) =>
+                  update(
+                    "confirm",
+                    value,
+                  )
                 }
                 placeholder="Confirm password"
                 secureTextEntry
-                />
-              )}
+              />
+            )}
 
-              {!!error && (
-                <Text
-                style={
-                  styles.authError
-                }
-                >
-                {error}
-                </Text>
-              )}
+          {!!error && (
+            <Text
+              style={
+                styles.authError
+              }
+            >
+              {error}
+            </Text>
+          )}
 
-              <Pressable
-              style={({
-                pressed,
-              }) => [
+          <Pressable
+            style={({
+              pressed,
+            }) => [
                 styles.primaryButton,
                 pressed && {
                   opacity: 0.82,
@@ -1532,228 +1532,228 @@ process.env.EXPO_BACKEND_URL ||
                   opacity: 0.6,
                 },
               ]}
-              onPress={
-                submit
-              }
-              disabled={
-                busy
-              }
-              >
-              {busy ? (
-                <ActivityIndicator
+            onPress={
+              submit
+            }
+            disabled={
+              busy
+            }
+          >
+            {busy ? (
+              <ActivityIndicator
                 color={C.white}
-                />
-              ) : (
-                <>
+              />
+            ) : (
+              <>
                 <Text
-                style={
-                  styles.primaryButtonText
-                }
+                  style={
+                    styles.primaryButtonText
+                  }
                 >
-                {mode ===
-                  "login"
-                  ? "Sign in"
-                  : "Create account"}
-                  </Text>
+                  {mode ===
+                    "login"
+                    ? "Sign in"
+                    : "Create account"}
+                </Text>
 
-                  <Ionicons
+                <Ionicons
                   name="arrow-forward"
                   size={19}
                   color={C.white}
-                  />
-                  </>
-              )}
-              </Pressable>
+                />
+              </>
+            )}
+          </Pressable>
 
-              <Pressable
-              onPress={() => {
-                setError("");
+          <Pressable
+            onPress={() => {
+              setError("");
 
-                setMode(
-                  mode ===
+              setMode(
+                mode ===
                   "login"
                   ? "signup"
                   : "login",
-                );
-              }}
-              >
-              <Text
+              );
+            }}
+          >
+            <Text
               style={
                 styles.authSwitch
               }
-              >
+            >
               {mode ===
                 "login"
                 ? "Don't have an account? Sign up"
                 : "Already have an account? Sign in"}
-                </Text>
-                </Pressable>
-                </View>
-                </ScrollView>
-                </KeyboardAvoidingView>
-    );
-  }
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
 
-  /* ============================================================
-   *   F IELD       *
-   *   ============================================================ */
+/* ============================================================
+ *   F IELD       *
+ *   ============================================================ */
 
-  function Field({
-    label,
-    value,
-    onChangeText,
-    placeholder,
-    secureTextEntry,
-    keyboardType,
-    autoCapitalize,
-    compact,
-  }: {
-    label: string;
-    value: string;
-    onChangeText: (
-      value: string,
-    ) => void;
-    placeholder?: string;
-    secureTextEntry?: boolean;
-    keyboardType?: any;
-    autoCapitalize?: any;
-    compact?: boolean;
-  }) {
-    return (
-      <View
+function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize,
+  compact,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (
+    value: string,
+  ) => void;
+  placeholder?: string;
+  secureTextEntry?: boolean;
+  keyboardType?: any;
+  autoCapitalize?: any;
+  compact?: boolean;
+}) {
+  return (
+    <View
       style={[
         styles.fieldWrap,
         compact && styles.metadataGridField,
       ]}
-      >
+    >
       <Text
-      style={
-        styles.fieldLabel
-      }
+        style={
+          styles.fieldLabel
+        }
       >
-      {label}
+        {label}
       </Text>
 
       <TextInput
-      value={value}
-      onChangeText={
-        onChangeText
-      }
-      placeholder={
-        placeholder
-      }
-      placeholderTextColor={
-        C.muted
-      }
-      secureTextEntry={
-        secureTextEntry
-      }
-      keyboardType={
-        keyboardType
-      }
-      autoCapitalize={
-        autoCapitalize
-      }
-      style={
-        styles.input
-      }
+        value={value}
+        onChangeText={
+          onChangeText
+        }
+        placeholder={
+          placeholder
+        }
+        placeholderTextColor={
+          C.muted
+        }
+        secureTextEntry={
+          secureTextEntry
+        }
+        keyboardType={
+          keyboardType
+        }
+        autoCapitalize={
+          autoCapitalize
+        }
+        style={
+          styles.input
+        }
       />
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   A PP SHELL   *
-   *   ============================================================ */
+/* ============================================================
+ *   A PP SHELL   *
+ *   ============================================================ */
 
-  function AppShell({
-    page,
-    setPage,
-    user,
-    datasets,
-    activeDataset,
-    token,
-    refresh,
-    signOut,
-    isDark,
-    toggleTheme,
-  }: {
-    page: Page;
-    setPage: (
-      page: Page,
-    ) => void;
-    user: User;
-    datasets: Dataset[];
-    activeDataset?: Dataset;
-    token: string;
-    refresh: (
-      token?: string,
-    ) => Promise<void>;
-    signOut: () => Promise<void>;
-    isDark: boolean;
-    toggleTheme: () => void;
-  }) {
-    const [
-      menuOpen,
-      setMenuOpen,
-    ] = useState(false);
+function AppShell({
+  page,
+  setPage,
+  user,
+  datasets,
+  activeDataset,
+  token,
+  refresh,
+  signOut,
+  isDark,
+  toggleTheme,
+}: {
+  page: Page;
+  setPage: (
+    page: Page,
+  ) => void;
+  user: User;
+  datasets: Dataset[];
+  activeDataset?: Dataset;
+  token: string;
+  refresh: (
+    token?: string,
+  ) => Promise<void>;
+  signOut: () => Promise<void>;
+  isDark: boolean;
+  toggleTheme: () => void;
+}) {
+  const [
+    menuOpen,
+    setMenuOpen,
+  ] = useState(false);
 
-    const title =
+  const title =
     NAV.find(
       (item) =>
-      item.id ===
-      page,
+        item.id ===
+        page,
     )?.label ||
     "Dashboard";
 
-          return (
-            <View
-            style={
-              styles.shell
-            }
-            >
-            <View
-            style={[
-              styles.sidebar,
-              menuOpen &&
-              styles.sidebarMobile,
-            ]}
-            >
-            <View
-            style={
-              styles.sidebarBrand
-            }
-            >
-            <Image
+  return (
+    <View
+      style={
+        styles.shell
+      }
+    >
+      <View
+        style={[
+          styles.sidebar,
+          menuOpen &&
+          styles.sidebarMobile,
+        ]}
+      >
+        <View
+          style={
+            styles.sidebarBrand
+          }
+        >
+          <Image
             source={require("../metalsense.png")}
             style={styles.sidebarLogo}
-            />
+          />
 
-            <Text
+          <Text
             style={
               styles.sidebarBrandText
             }
-            >
+          >
             MetalSense
-            </Text>
-            </View>
+          </Text>
+        </View>
 
-            <Text
-            style={
-              styles.workspaceLabel
-            }
-            >
-            WORKSPACE
-            </Text>
+        <Text
+          style={
+            styles.workspaceLabel
+          }
+        >
+          WORKSPACE
+        </Text>
 
-            <View
-            style={
-              styles.navList
-            }
-            >
-            {NAV.map(
-              (item) => (
-                <Pressable
+        <View
+          style={
+            styles.navList
+          }
+        >
+          {NAV.map(
+            (item) => (
+              <Pressable
                 key={
                   item.id
                 }
@@ -1768,234 +1768,234 @@ process.env.EXPO_BACKEND_URL ||
                 style={({
                   pressed,
                 }) => [
-                  styles.navItem,
-                  page ===
-                  item.id &&
-                  styles.navItemActive,
-                  pressed && {
-                    opacity: 0.8,
-                  },
-                ]}
-                >
+                    styles.navItem,
+                    page ===
+                    item.id &&
+                    styles.navItemActive,
+                    pressed && {
+                      opacity: 0.8,
+                    },
+                  ]}
+              >
                 <Ionicons
-                name={
-                  item.icon
-                }
-                size={19}
-                color={
-                  page ===
-                  item.id
-                  ? C.green
-                  : C.muted
-                }
+                  name={
+                    item.icon
+                  }
+                  size={19}
+                  color={
+                    page ===
+                      item.id
+                      ? C.green
+                      : C.muted
+                  }
                 />
 
                 <Text
-                style={[
-                  styles.navText,
-                  page ===
-                  item.id &&
-                  styles.navTextActive,
-                ]}
+                  style={[
+                    styles.navText,
+                    page ===
+                    item.id &&
+                    styles.navTextActive,
+                  ]}
                 >
-                {item.label}
+                  {item.label}
                 </Text>
-                </Pressable>
-              ),
-            )}
-            </View>
+              </Pressable>
+            ),
+          )}
+        </View>
 
-            <View
-            style={
-              styles.sidebarBottom
-            }
-            >
-            <View
+        <View
+          style={
+            styles.sidebarBottom
+          }
+        >
+          <View
             style={
               styles.sidebarDivider
             }
-            />
+          />
 
-            <View
+          <View
             style={
               styles.userMini
             }
-            >
+          >
             <View
-            style={
-              styles.avatarSmall
-            }
+              style={
+                styles.avatarSmall
+              }
             >
-            <Text
-            style={
-              styles.avatarLetter
-            }
-            >
-            {initials(
-              user.full_name,
-            )}
-            </Text>
+              <Text
+                style={
+                  styles.avatarLetter
+                }
+              >
+                {initials(
+                  user.full_name,
+                )}
+              </Text>
             </View>
 
             <View
-            style={{
-              flex: 1,
-            }}
+              style={{
+                flex: 1,
+              }}
             >
-            <Text
-            style={
-              styles.userMiniName
-            }
-            >
-            {
-              user.full_name
-            }
-            </Text>
+              <Text
+                style={
+                  styles.userMiniName
+                }
+              >
+                {
+                  user.full_name
+                }
+              </Text>
 
-            <Text
-            style={
-              styles.userMiniRole
-            }
-            >
-            {
-              user.role
-            }
-            </Text>
+              <Text
+                style={
+                  styles.userMiniRole
+                }
+              >
+                {
+                  user.role
+                }
+              </Text>
             </View>
 
             <Pressable
-            onPress={
-              signOut
-            }
+              onPress={
+                signOut
+              }
             >
-            <Ionicons
-            name="log-out-outline"
-            size={20}
-            color={
-              C.muted
-            }
-            />
+              <Ionicons
+                name="log-out-outline"
+                size={20}
+                color={
+                  C.muted
+                }
+              />
             </Pressable>
-            </View>
-            </View>
-            </View>
+          </View>
+        </View>
+      </View>
 
-            <View
-            style={
-              styles.main
-            }
-            >
-            <View
-            style={
-              styles.topbar
-            }
-            >
-            <Pressable
+      <View
+        style={
+          styles.main
+        }
+      >
+        <View
+          style={
+            styles.topbar
+          }
+        >
+          <Pressable
             style={
               styles.mobileMenu
             }
             onPress={() =>
               setMenuOpen(
                 (old) =>
-                !old,
+                  !old,
               )
             }
-            >
+          >
             <Ionicons
-            name="menu-outline"
-            size={24}
-            color={
-              C.text
-            }
+              name="menu-outline"
+              size={24}
+              color={
+                C.text
+              }
             />
-            </Pressable>
+          </Pressable>
 
-            <View
+          <View
             style={
               styles.topbarTitle
             }
-            >
+          >
             <Ionicons
-            name="water"
-            size={20}
-            color={
-              C.teal
-            }
+              name="water"
+              size={20}
+              color={
+                C.teal
+              }
             />
 
             <View>
-            <Text
-            style={
-              styles.topTitle
-            }
-            >
-            {title}
-            </Text>
+              <Text
+                style={
+                  styles.topTitle
+                }
+              >
+                {title}
+              </Text>
 
-            <Text
-            style={
-              styles.topSubtitle
-            }
-            >
-            Welcome,{" "}
-            {
-              user.full_name
-            }{" "}
-            ·{" "}
-            {
-              user.role
-            }
-            </Text>
+              <Text
+                style={
+                  styles.topSubtitle
+                }
+              >
+                Welcome,{" "}
+                {
+                  user.full_name
+                }{" "}
+                ·{" "}
+                {
+                  user.role
+                }
+              </Text>
             </View>
-            </View>
+          </View>
 
-            <Pressable
+          <Pressable
             onPress={toggleTheme}
             style={styles.themeToggle}
             accessibilityRole="button"
             accessibilityLabel={
               isDark ? "Switch to light mode" : "Switch to dark mode"
             }
-            >
+          >
             <Ionicons
-            name={isDark ? "sunny-outline" : "moon-outline"}
-            size={18}
-            color={C.teal}
+              name={isDark ? "sunny-outline" : "moon-outline"}
+              size={18}
+              color={C.teal}
             />
             <Text style={styles.themeToggleText}>
-            {isDark ? "Light" : "Dark"}
+              {isDark ? "Light" : "Dark"}
             </Text>
-            </Pressable>
+          </Pressable>
 
-            <View
+          <View
             style={
               styles.topAvatar
             }
-            >
+          >
             <Text
-            style={
-              styles.topAvatarText
-            }
+              style={
+                styles.topAvatarText
+              }
             >
-            {initials(
-              user.full_name,
-            )}
+              {initials(
+                user.full_name,
+              )}
             </Text>
-            </View>
-            </View>
+          </View>
+        </View>
 
-            <ScrollView
-            style={
-              styles.content
-            }
-            contentContainerStyle={
-              styles.contentInner
-            }
-            showsVerticalScrollIndicator
-            >
-            {page ===
-              "dashboard" && (
-                <Dashboard
+        <ScrollView
+          style={
+            styles.content
+          }
+          contentContainerStyle={
+            styles.contentInner
+          }
+          showsVerticalScrollIndicator
+        >
+          {page ===
+            "dashboard" && (
+              <Dashboard
                 user={
                   user
                 }
@@ -2008,178 +2008,178 @@ process.env.EXPO_BACKEND_URL ||
                 setPage={
                   setPage
                 }
-                />
-              )}
+              />
+            )}
 
-              {page ===
-                "import" && (
-                  <ImportScreen
-                  datasets={
-                    datasets
-                  }
-                  token={
-                    token
-                  }
-                  refresh={
-                    refresh
-                  }
-                  />
-                )}
+          {page ===
+            "import" && (
+              <ImportScreen
+                datasets={
+                  datasets
+                }
+                token={
+                  token
+                }
+                refresh={
+                  refresh
+                }
+              />
+            )}
 
-                {page ===
-                  "quality" && (
-                    <QualityScreen
-                    dataset={
-                      activeDataset
-                    }
-                    />
-                  )}
+          {page ===
+            "quality" && (
+              <QualityScreen
+                dataset={
+                  activeDataset
+                }
+              />
+            )}
 
-                  {page ===
-                    "analysis" && (
-                      <AnalysisScreen
-                      dataset={
-                        activeDataset
-                      }
-                      token={
-                        token
-                      }
-                      />
-                    )}
+          {page ===
+            "analysis" && (
+              <AnalysisScreen
+                dataset={
+                  activeDataset
+                }
+                token={
+                  token
+                }
+              />
+            )}
 
-                    {page ===
-                      "spatial" && (
-                        <SpatialScreen
-                        dataset={
-                          activeDataset
-                        }
-                        token={
-                          token
-                        }
-                        />
-                      )}
+          {page ===
+            "spatial" && (
+              <SpatialScreen
+                dataset={
+                  activeDataset
+                }
+                token={
+                  token
+                }
+              />
+            )}
 
-                      {page ===
-                        "reports" && (
-                          <ReportsScreen
-                          dataset={
-                            activeDataset
-                          }
-                          datasets={
-                            datasets
-                          }
-                          user={
-                            user
-                          }
-                          />
-                        )}
+          {page ===
+            "reports" && (
+              <ReportsScreen
+                dataset={
+                  activeDataset
+                }
+                datasets={
+                  datasets
+                }
+                user={
+                  user
+                }
+              />
+            )}
 
-                        {page ===
-                          "profile" && (
-                            <ProfileScreen
-                            user={
-                              user
-                            }
-                            signOut={
-                              signOut
-                            }
-                            />
-                          )}
-                          </ScrollView>
-                          </View>
-                          </View>
-          );
-  }
+          {page ===
+            "profile" && (
+              <ProfileScreen
+                user={
+                  user
+                }
+                signOut={
+                  signOut
+                }
+              />
+            )}
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   P AGE INTRO  *
-   *   ============================================================ */
+/* ============================================================
+ *   P AGE INTRO  *
+ *   ============================================================ */
 
-  function PageIntro({
-    eyebrow,
-    title,
-    description,
-  }: {
-    eyebrow: string;
-    title: string;
-    description: string;
-  }) {
-    return (
-      <View
+function PageIntro({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <View
       style={
         styles.pageIntro
       }
-      >
+    >
       <Text
-      style={
-        styles.pageEyebrow
-      }
+        style={
+          styles.pageEyebrow
+        }
       >
-      {eyebrow}
+        {eyebrow}
       </Text>
 
       <Text
-      style={
-        styles.pageTitle
-      }
+        style={
+          styles.pageTitle
+        }
       >
-      {title}
+        {title}
       </Text>
 
       <Text
-      style={
-        styles.pageDescription
-      }
+        style={
+          styles.pageDescription
+        }
       >
-      {description}
+        {description}
       </Text>
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   D ASHBOARD   *
-   *   ============================================================ */
+/* ============================================================
+ *   D ASHBOARD   *
+ *   ============================================================ */
 
-  // Main dashboard overview
-  function Dashboard({
-    datasets,
-    token,
-    setPage,
-  }: {
-    user: User;
-    datasets: Dataset[];
-    token: string;
-    setPage: (
-      page: Page,
-    ) => void;
-  }) {
-    const dataset =
+// Main dashboard overview
+function Dashboard({
+  datasets,
+  token,
+  setPage,
+}: {
+  user: User;
+  datasets: Dataset[];
+  token: string;
+  setPage: (
+    page: Page,
+  ) => void;
+}) {
+  const dataset =
     datasets[0];
 
-    const [summary, setSummary] =
+  const [summary, setSummary] =
     useState<AnalysisSummary | null>(null);
 
-    const [loadingSummary, setLoadingSummary] =
+  const [loadingSummary, setLoadingSummary] =
     useState(false);
 
-    useEffect(() => {
-      let active = true;
+  useEffect(() => {
+    let active = true;
 
-      if (!dataset?.dataset_id || !token) {
-        setSummary(null);
-        return () => {
-          active = false;
-        };
-      }
+    if (!dataset?.dataset_id || !token) {
+      setSummary(null);
+      return () => {
+        active = false;
+      };
+    }
 
-      setLoadingSummary(true);
+    setLoadingSummary(true);
 
-      api(
-        `/analysis/${dataset.dataset_id}/summary`,
-        {},
-        token,
-      )
+    api(
+      `/analysis/${dataset.dataset_id}/summary`,
+      {},
+      token,
+    )
       .then((data) => {
         if (active) {
           setSummary(data);
@@ -2197,760 +2197,765 @@ process.env.EXPO_BACKEND_URL ||
         }
       });
 
-      return () => {
-        active = false;
-      };
-    }, [dataset?.dataset_id, token]);
+    return () => {
+      active = false;
+    };
+  }, [dataset?.dataset_id, token]);
 
-    const metrics = sampleMetrics(dataset);
+  const metrics = sampleMetrics(dataset);
 
-    const samples =
+  const samples =
     summary?.record_count ??
     metrics.length;
 
 
-    const locations =
+  const locations =
     new Set(
       metrics.map(
         (item) =>
-        `item.lat.toFixed(5),{item.lon.toFixed(5)}`,
+          `item.lat.toFixed(5),{item.lon.toFixed(5)}`,
       ),
     ).size;
 
-    const lowCount =
+  const lowCount =
     summary?.low_samples ??
     metrics.filter(
       (item) => item.status === "LOW",
     ).length;
 
-    const moderateCount =
+  const moderateCount =
     summary?.moderate_samples ??
     metrics.filter(
       (item) => item.status === "MODERATE",
     ).length;
 
-    const highCount =
+  const highCount =
     summary?.high_samples ??
     metrics.filter(
       (item) =>
-      item.status === "HIGH" ||
-      item.status === "CRITICAL",
+        item.status === "HIGH" ||
+        item.status === "CRITICAL",
     ).length;
 
-    const safeCount =
+  const safeCount =
     summary?.safe_samples ??
     metrics.filter(
       (item) => item.status === "SAFE",
     ).length;
 
-    const averageHpi =
+  const averageHpi =
     summary?.average_hpi ?? 0;
-    const averageHei =
+  const averageHei =
     summary?.average_hei ?? 0;
-    const averageCd =
+  const averageCd =
     summary?.average_cd ?? 0;
 
-    const hpiPercent = Math.min(
-      100,
-      Math.max(0, (averageHpi / 300) * 100),
-    );
+  const hpiPercent = Math.min(
+    100,
+    Math.max(0, (averageHpi / 300) * 100),
+  );
 
-    const heiPercent = Math.min(
-      100,
-      Math.max(0, (averageHei / 50) * 100),
-    );
+  const heiPercent = Math.min(
+    100,
+    Math.max(0, (averageHei / 50) * 100),
+  );
 
-    const cdPercent = Math.min(
-      100,
-      Math.max(0, (averageCd / 25) * 100),
-    );
+  const cdPercent = Math.min(
+    100,
+    Math.max(0, (averageCd / 25) * 100),
+  );
 
-    const combinedTotal =
+  const combinedTotal =
     Math.max(averageHpi, 0) +
     Math.max(averageHei, 0) +
     Math.max(averageCd, 0);
 
-    const combinedHpi =
+  const combinedHpi =
     combinedTotal > 0
-    ? (Math.max(averageHpi, 0) / combinedTotal) * 100
-    : 0;
+      ? (Math.max(averageHpi, 0) / combinedTotal) * 100
+      : 0;
 
-    const combinedHei =
+  const combinedHei =
     combinedTotal > 0
-    ? (Math.max(averageHei, 0) / combinedTotal) * 100
-    : 0;
+      ? (Math.max(averageHei, 0) / combinedTotal) * 100
+      : 0;
 
-    const combinedCd =
+  const combinedCd =
     combinedTotal > 0
-    ? (Math.max(averageCd, 0) / combinedTotal) * 100
-    : 0;
+      ? (Math.max(averageCd, 0) / combinedTotal) * 100
+      : 0;
 
-    return (
-      <View>
+  return (
+    <View>
       <View
-      style={
-        styles.heroCard
-      }
+        style={
+          styles.heroCard
+        }
       >
-      <View
-      style={{
-        flex: 1,
-      }}
-      >
-      <Text
-      style={
-        styles.heroEyebrow
-      }
-      >
-      METALSENSE
-      INTELLIGENCE
-      </Text>
+        <View
+          style={{
+            flex: 1,
+          }}
+        >
+          <Text
+            style={
+              styles.heroEyebrow
+            }
+          >
+            METALSENSE
+            INTELLIGENCE
+          </Text>
 
-      <Text
-      style={
-        styles.heroTitle
-      }
-      >
-      A clearer view
-      of water quality.
-      </Text>
+          <Text
+            style={
+              styles.heroTitle
+            }
+          >
+            A clearer view
+            of water quality.
+          </Text>
 
-      <Text
-      style={
-        styles.heroText
-      }
-      >
-      Validate evidence,
-      trace standards,
-      and understand
-      heavy-metal risk
-      without losing
-      provenance.
-      </Text>
+          <Text
+            style={
+              styles.heroText
+            }
+          >
+            Validate evidence,
+            trace standards,
+            and understand
+            heavy-metal risk
+            without losing
+            provenance.
+          </Text>
+        </View>
+
+        <Pressable
+          style={
+            styles.importButton
+          }
+          onPress={() =>
+            setPage("import")
+          }
+        >
+          <Ionicons
+            name="cloud-upload-outline"
+            size={19}
+            color={C.white}
+          />
+
+          <Text
+            style={
+              styles.importButtonText
+            }
+          >
+            Import dataset
+          </Text>
+        </Pressable>
       </View>
 
-      <Pressable
-      style={
-        styles.importButton
-      }
-      onPress={() =>
-        setPage("import")
-      }
-      >
-      <Ionicons
-      name="cloud-upload-outline"
-      size={19}
-      color={C.white}
-      />
-
-      <Text
-      style={
-        styles.importButtonText
-      }
-      >
-      Import dataset
-      </Text>
-      </Pressable>
-      </View>
-
       <View
-      style={
-        styles.statRow
-      }
+        style={
+          styles.statRow
+        }
       >
-      <StatCard
-      icon="flask-outline"
-      value={
-        samples
-      }
-      label="Samples"
-      />
+        <StatCard
+          icon="flask-outline"
+          value={
+            samples
+          }
+          label="Samples"
+        />
 
-      <StatCard
-      icon="documents-outline"
-      value={
-        datasets.length
-      }
-      label="Files"
-      />
+        <StatCard
+          icon="documents-outline"
+          value={
+            datasets.length
+          }
+          label="Files"
+        />
 
-      <StatCard
-      icon="location-outline"
-      value={
-        locations ||
-        0
-      }
-      label="Locations"
-      />
+        <StatCard
+          icon="location-outline"
+          value={
+            locations ||
+            0
+          }
+          label="Locations"
+        />
       </View>
 
       <View style={styles.dashboardTopRow}>
-      <View style={styles.dashboardSidePanel}>
-      <View
-      style={
-        styles.panel
-      }
-      >
-      <Text
-      style={
-        styles.panelTitle
-      }
-      >
-      Latest imported
-      evidence
-      </Text>
-
-      <Text
-      style={
-        styles.panelSubtitle
-      }
-      >
-      {
-        samples
-      }{" "}
-      validated samples
-      </Text>
-
-      {loadingSummary && (
-        <View style={styles.loadingBanner}>
-        <ActivityIndicator color={C.green} />
-        <Text style={styles.loadingText}>Refreshing analysis summary…</Text>
-        </View>
-      )}
-
-      {metrics.length ===
-        0 ? (
-          <EmptyState
-          icon="flask-outline"
-          title="No monitoring data yet"
-          text="Import a CSV or Excel workbook to begin."
-          />
-        ) : (
-          metrics
-          .slice(0, 8)
-          .map(
-            (
-              item,
-            ) => (
-              <SampleRow
-              key={
-                item.id
+        <View style={styles.dashboardSidePanel}>
+          <View
+            style={
+              styles.panel
+            }
+          >
+            <Text
+              style={
+                styles.panelTitle
               }
-              item={
-                item
+            >
+              Latest imported
+              evidence
+            </Text>
+
+            <Text
+              style={
+                styles.panelSubtitle
               }
+            >
+              {
+                samples
+              }{" "}
+              validated samples
+            </Text>
+
+            {loadingSummary && (
+              <View style={styles.loadingBanner}>
+                <ActivityIndicator color={C.green} />
+                <Text style={styles.loadingText}>Refreshing analysis summary…</Text>
+              </View>
+            )}
+
+            {metrics.length ===
+              0 ? (
+              <EmptyState
+                icon="flask-outline"
+                title="No monitoring data yet"
+                text="Import a CSV or Excel workbook to begin."
               />
-            ),
-          )
-        )}
-        </View>
+            ) : (
+              metrics
+                .slice(0, 8)
+                .map(
+                  (
+                    item,
+                  ) => (
+                    <SampleRow
+                      key={
+                        item.id
+                      }
+                      item={
+                        item
+                      }
+                    />
+                  ),
+                )
+            )}
+          </View>
         </View>
 
         <View style={styles.dashboardChartPanel}>
-        <Text style={styles.panelTitle}>
-        Risk distribution
-        </Text>
-        <Text style={styles.panelSubtitle}>
-        Samples grouped by their calculated pollution status.
-        </Text>
+          <Text style={styles.panelTitle}>
+            Risk distribution
+          </Text>
+          <Text style={styles.panelSubtitle}>
+            Samples grouped by their calculated pollution status.
+          </Text>
 
-        <View style={styles.chartGrid}>
-        {[
-          ["LOW", lowCount, C.green],
-          ["MODERATE", moderateCount, C.warning],
-          ["HIGH / CRITICAL", highCount, C.danger],
-          ["SAFE", safeCount, C.greenDark],
-        ].map((item) => {
-          const count = Number(item[1]);
-          const total = Math.max(
-            lowCount +
-            moderateCount +
-            highCount +
-            safeCount,
-            1,
-          );
-          const share = Math.round(
-            (count / total) * 100,
-          );
+          <View style={styles.chartGrid}>
+            {[
+              ["LOW", lowCount, C.green],
+              ["MODERATE", moderateCount, C.warning],
+              ["HIGH / CRITICAL", highCount, C.danger],
+              ["SAFE", safeCount, C.greenDark],
+            ].map((item) => {
+              const count = Number(item[1]);
+              const total = Math.max(
+                lowCount +
+                moderateCount +
+                highCount +
+                safeCount,
+                1,
+              );
+              const share = Math.round(
+                (count / total) * 100,
+              );
 
-          return (
-            <View
-            key={String(item[0])}
-            style={styles.chartRow}
-            >
-            <View style={styles.chartCardTop}>
-            <View
-            style={[
-              styles.chartStatusDot,
-              {
-                backgroundColor: String(item[2]),
-              },
-            ]}
-            />
+              return (
+                <View
+                  key={String(item[0])}
+                  style={styles.chartRow}
+                >
+                  <View style={styles.chartCardTop}>
+                    <View
+                      style={[
+                        styles.chartStatusDot,
+                        {
+                          backgroundColor: String(item[2]),
+                        },
+                      ]}
+                    />
 
-            <Text style={styles.chartLabel}>
-            {String(item[0])}
-            </Text>
+                    <Text style={styles.chartLabel}>
+                      {String(item[0])}
+                    </Text>
 
-            <Text style={styles.chartValue}>
-            {count}
-            </Text>
-            </View>
+                    <Text style={styles.chartValue}>
+                      {count}
+                    </Text>
+                  </View>
 
-            <View style={styles.chartTrack}>
-            <View
-            style={[
-              styles.chartBar,
-              {
-                width: `${share}%`,
-                minWidth: count > 0 ? 8 : 0,
-                backgroundColor: String(item[2]),
-              },
-            ]}
-            />
-            </View>
+                  <View style={styles.chartTrack}>
+                    <View
+                      style={[
+                        styles.chartBar,
+                        {
+                          width: `${share}%`,
+                          minWidth: count > 0 ? 8 : 0,
+                          backgroundColor: String(item[2]),
+                        },
+                      ]}
+                    />
+                  </View>
 
-            <Text style={styles.chartShare}>
-            {share}% of total samples
-            </Text>
-            </View>
-          );
-        })}
-        </View>
+                  <Text style={styles.chartShare}>
+                    {share}% of total samples
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
 
         <View style={styles.dashboardKCard}>
-        <Text style={styles.panelTitle}>
-        Pollution indices
-        </Text>
-        <Text style={styles.panelSubtitle}>
-        Average index values for the active dataset.
-        </Text>
+          <Text style={styles.panelTitle}>
+            Pollution indices
+          </Text>
+          <Text style={styles.panelSubtitle}>
+            Average index values for the active dataset.
+          </Text>
 
-        <View style={styles.dashboardDonutGrid}>
-        <DonutChart
-        label="HPI"
-        value={averageHpi}
-        percent={hpiPercent}
-        color={C.teal}
-        max={300}
-        />
+          <View style={styles.dashboardDonutGrid}>
+            <DonutChart
+              label="HPI"
+              value={averageHpi}
+              percent={hpiPercent}
+              color={C.teal}
+              max={300}
+            />
 
-        <DonutChart
-        label="HEI"
-        value={averageHei}
-        percent={heiPercent}
-        color={C.green}
-        max={50}
-        />
+            <DonutChart
+              label="HEI"
+              value={averageHei}
+              percent={heiPercent}
+              color={C.green}
+              max={50}
+            />
 
-        <DonutChart
-        label="CD"
-        value={averageCd}
-        percent={cdPercent}
-        color={C.warning}
-        max={25}
-        />
+            <DonutChart
+              label="CD"
+              value={averageCd}
+              percent={cdPercent}
+              color={C.warning}
+              max={25}
+            />
 
-        <DonutChart
-        label="Combined"
-        value={combinedTotal}
-        percent={100}
-        segments={[
-          {
-            value: combinedHpi,
-            color: C.teal,
-            label: "HPI",
-          },
-          {
-            value: combinedHei,
-            color: C.green,
-            label: "HEI",
-          },
-          {
-            value: combinedCd,
-            color: C.warning,
-            label: "CD",
-          },
-        ]}
-        />
+            <DonutChart
+              label="Combined"
+              value={combinedTotal}
+              percent={100}
+              segments={[
+                {
+                  value: combinedHpi,
+                  color: C.teal,
+                  label: "HPI",
+                },
+                {
+                  value: combinedHei,
+                  color: C.green,
+                  label: "HEI",
+                },
+                {
+                  value: combinedCd,
+                  color: C.warning,
+                  label: "CD",
+                },
+              ]}
+            />
+          </View>
+
+          <View style={styles.dashboardIndexFooter}>
+            <View style={styles.dashboardIndexLegendItem}>
+              <View
+                style={[
+                  styles.dashboardIndexLegendDot,
+                  { backgroundColor: C.teal },
+                ]}
+              />
+              <Text style={styles.dashboardIndexLegendText}>
+                HPI {combinedHpi.toFixed(1)}%
+              </Text>
+            </View>
+
+            <View style={styles.dashboardIndexLegendItem}>
+              <View
+                style={[
+                  styles.dashboardIndexLegendDot,
+                  { backgroundColor: C.green },
+                ]}
+              />
+              <Text style={styles.dashboardIndexLegendText}>
+                HEI {combinedHei.toFixed(1)}%
+              </Text>
+            </View>
+
+            <View style={styles.dashboardIndexLegendItem}>
+              <View
+                style={[
+                  styles.dashboardIndexLegendDot,
+                  { backgroundColor: C.warning },
+                ]}
+              />
+              <Text style={styles.dashboardIndexLegendText}>
+                CD {combinedCd.toFixed(1)}%
+              </Text>
+            </View>
+          </View>
         </View>
-
-        <View style={styles.dashboardIndexFooter}>
-        <View style={styles.dashboardIndexLegendItem}>
-        <View
-        style={[
-          styles.dashboardIndexLegendDot,
-          { backgroundColor: C.teal },
-        ]}
-        />
-        <Text style={styles.dashboardIndexLegendText}>
-        HPI {combinedHpi.toFixed(1)}%
-        </Text>
-        </View>
-
-        <View style={styles.dashboardIndexLegendItem}>
-        <View
-        style={[
-          styles.dashboardIndexLegendDot,
-          { backgroundColor: C.green },
-        ]}
-        />
-        <Text style={styles.dashboardIndexLegendText}>
-        HEI {combinedHei.toFixed(1)}%
-        </Text>
-        </View>
-
-        <View style={styles.dashboardIndexLegendItem}>
-        <View
-        style={[
-          styles.dashboardIndexLegendDot,
-          { backgroundColor: C.warning },
-        ]}
-        />
-        <Text style={styles.dashboardIndexLegendText}>
-        CD {combinedCd.toFixed(1)}%
-        </Text>
-        </View>
-        </View>
-        </View>
-        </View>
-        </View>
-    );
-  }
+      </View>
+    </View>
+  );
+}
 
 
-  // Circular index summary used by the dashboard
-  function DonutChart({
-    label,
-    value,
-    percent,
-    color,
-    max,
-    segments,
-  }: {
-    label: string;
+// Circular index summary used by the dashboard
+function DonutChart({
+  label,
+  value,
+  percent,
+  color,
+  max,
+  segments,
+}: {
+  label: string;
+  value: number;
+  percent: number;
+  color?: string;
+  max?: number;
+  segments?: {
     value: number;
-    percent: number;
-    color?: string;
-    max?: number;
-    segments?: {
-      value: number;
-      color: string;
-      label: string;
-    }[];
-  }) {
-    const size = 110;
-    const strokeWidth = 13;
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-
-    const donutSegments =
-    segments && segments.length > 0
-    ? segments
-    : [
-      {
-        value: Math.min(100, Math.max(0, percent)),
-        color: color || C.teal,
-        label,
-      },
-      {
-        value: Math.max(
-          0,
-          100 - Math.min(100, Math.max(0, percent)),
-        ),
-        color: C.mint2,
-        label: "Remaining",
-      },
-    ];
-
-    let accumulated = 0;
-
-    return (
-      <View style={styles.dashboardDonutItem}>
-      <View style={styles.dashboardDonut}>
-      <Svg width={size} height={size}>
-      <Circle
-      cx={size / 2}
-      cy={size / 2}
-      r={radius}
-      stroke={C.mint2}
-      strokeWidth={strokeWidth}
-      fill="none"
-      />
-
-      {donutSegments.map((segment, index) => {
-        const segmentLength =
-        (Math.max(0, segment.value) / 100) *
-        circumference;
-
-        const dashOffset = -accumulated;
-        accumulated += segmentLength;
-
-        return (
-          <Circle
-          key={`segment.label-{index}`}
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={segment.color}
-          strokeWidth={strokeWidth}
-          fill="none"
-          strokeDasharray={`${segmentLength} ${circumference}`}
-          strokeDashoffset={dashOffset}
-          strokeLinecap="round"
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        );
-      })}
-      </Svg>
-
-      <View style={styles.dashboardDonutCenter}>
-      <Text style={styles.dashboardDonutValue}>
-      {label === "Combined"
-        ? "100"
-        : value.toFixed(2)}
-        </Text>
-
-        <Text style={styles.dashboardDonutUnit}>
-        {label === "Combined"
-          ? "%"
-          : `${Math.round(percent)}%`}
-          </Text>
-          </View>
-          </View>
-
-          <Text style={styles.dashboardDonutLabel}>
-          {label}
-          </Text>
-
-          {max ? (
-            <Text style={styles.dashboardDonutMeta}>
-            {Math.round(percent)}% of {max}
-            </Text>
-          ) : null}
-          </View>
-    );
-  }
-
-  /* ============================================================
-   *   S TAT CARD   *
-   *   ============================================================ */
-
-  // Compact summary card
-  function StatCard({
-    icon,
-    value,
-    label,
-  }: {
-    icon: keyof typeof Ionicons.glyphMap;
-    value:
-    | number
-    | string;
+    color: string;
     label: string;
-  }) {
-    return (
-      <View
+  }[];
+}) {
+  const size = 110;
+  const strokeWidth = 13;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  const donutSegments =
+    segments && segments.length > 0
+      ? segments
+      : [
+        {
+          value: Math.min(100, Math.max(0, percent)),
+          color: color || C.teal,
+          label,
+        },
+        {
+          value: Math.max(
+            0,
+            100 - Math.min(100, Math.max(0, percent)),
+          ),
+          color: C.mint2,
+          label: "Remaining",
+        },
+      ];
+
+  let accumulated = 0;
+
+  return (
+    <View style={styles.dashboardDonutItem}>
+      <View style={styles.dashboardDonut}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={C.mint2}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+
+          {donutSegments.map((segment, index) => {
+            const segmentLength =
+              (Math.max(0, segment.value) / 100) *
+              circumference;
+
+            const dashOffset = -accumulated;
+            accumulated += segmentLength;
+
+            return (
+              <Circle
+                key={`segment.label-{index}`}
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                stroke={segment.color}
+                strokeWidth={strokeWidth}
+                fill="none"
+                strokeDasharray={`${segmentLength} ${circumference}`}
+                strokeDashoffset={dashOffset}
+                strokeLinecap="round"
+                transform={`rotate(-90 ${size / 2} ${size / 2})`}
+              />
+            );
+          })}
+        </Svg>
+
+        <View style={styles.dashboardDonutCenter}>
+          <Text style={styles.dashboardDonutValue}>
+            {label === "Combined"
+              ? "100"
+              : value.toFixed(2)}
+          </Text>
+
+          <Text style={styles.dashboardDonutUnit}>
+            {label === "Combined"
+              ? "%"
+              : `${Math.round(percent)}%`}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.dashboardDonutLabel}>
+        {label}
+      </Text>
+
+      {max ? (
+        <Text style={styles.dashboardDonutMeta}>
+          {Math.round(percent)}% of {max}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/* ============================================================
+ *   S TAT CARD   *
+ *   ============================================================ */
+
+// Compact summary card
+function StatCard({
+  icon,
+  value,
+  label,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  value:
+  | number
+  | string;
+  label: string;
+}) {
+  return (
+    <View
       style={
         styles.statCard
       }
-      >
+    >
       <Ionicons
-      name={icon}
-      size={21}
-      color={
-        C.teal
-      }
+        name={icon}
+        size={21}
+        color={
+          C.teal
+        }
       />
 
       <Text
-      style={
-        styles.statValue
-      }
+        style={
+          styles.statValue
+        }
       >
-      {value}
+        {value}
       </Text>
 
       <Text
-      style={
-        styles.statLabel
-      }
+        style={
+          styles.statLabel
+        }
       >
-      {label}
+        {label}
       </Text>
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   S AMPLE ROW  *
-   *   ============================================================ */
+/* ============================================================
+ *   S AMPLE ROW  *
+ *   ============================================================ */
 
-  function SampleRow({
-    item,
-  }: {
-    item: ReturnType<
+function SampleRow({
+  item,
+}: {
+  item: ReturnType<
     typeof sampleMetrics
-    >[number];
-    key?: string;
-  }) {
-    const row =
+  >[number];
+  key?: string;
+}) {
+  const row =
     item.row || {};
 
-    const country =
+  const country =
     row.country ||
     "Unknown country";
 
-          const area =
-          row.area ||
-          row.region ||
-          "Unknown area";
+  const area =
+    row.area ||
+    row.region ||
+    "Unknown area";
 
-    const authority =
+  const authority =
     row.authority ||
     "Unknown authority";
 
-    const standard =
+  const standard =
     row.standard ||
     "Standard unavailable";
 
-    return (
-      <View
+  return (
+    <View
       style={
         styles.sampleRow
       }
-      >
+    >
       <View
-      style={[
-        styles.statusDot,
-        {
-          backgroundColor:
-          statusColor(
-            item.status,
-          ),
-        },
-      ]}
+        style={[
+          styles.statusDot,
+          {
+            backgroundColor:
+              statusColor(
+                item.status,
+              ),
+          },
+        ]}
       />
 
       <View
-      style={{
-        flex: 1,
-        minWidth: 0,
-      }}
+        style={{
+          flex: 1,
+          minWidth: 0,
+        }}
       >
-      <Text
-      style={
-        styles.sampleTitle
-      }
-      >
-      {
-        item.id
-      }{" "}
-      ·{" "}
-      {
-        item.status
-      }
-      </Text>
+        <Text
+          style={
+            styles.sampleTitle
+          }
+        >
+          {
+            item.id
+          }{" "}
+          ·{" "}
+          {
+            item.status
+          }
+        </Text>
 
-      <Text
-      style={
-        styles.sampleMeta
-      }
-      >
-      {country} ·{" "}
-      {area} ·{" "}
-      {authority} ·{" "}
-      {standard}
-      </Text>
+        <Text
+          style={
+            styles.sampleMeta
+          }
+        >
+          {country} ·{" "}
+          {area} ·{" "}
+          {authority} ·{" "}
+          {standard}
+        </Text>
       </View>
 
       <View
-      style={
-        styles.sampleRight
-      }
+        style={
+          styles.sampleRight
+        }
       >
-      <Text
-      style={
-        styles.sampleHpi
-      }
-      >
-      HPI{" "}
-      {
-        item.hpi.toFixed(
-          2,
-        )
-      }
-      </Text>
+        <Text
+          style={
+            styles.sampleHpi
+          }
+        >
+          HPI{" "}
+          {
+            item.hpi.toFixed(
+              2,
+            )
+          }
+        </Text>
 
-      <Text
-      style={
-        styles.sampleHei
-      }
-      >
-      HEI{" "}
-      {
-        item.hei.toFixed(
-          2,
-        )
-      }{" "}
-      · Cd{" "}
-      {
-        item.cd.toFixed(
-          2,
-        )
-      }
-      </Text>
+        <Text
+          style={
+            styles.sampleHei
+          }
+        >
+          HEI{" "}
+          {
+            item.hei.toFixed(
+              2,
+            )
+          }{" "}
+          · Cd{" "}
+          {
+            item.cd.toFixed(
+              2,
+            )
+          }
+        </Text>
       </View>
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   I MPORT SCREE*N
-   *   ============================================================ */
+/* ============================================================
+ *   I MPORT SCREE*N
+ *   ============================================================ */
 
-  // Dataset import and validation
-  function ImportScreen({
-    datasets,
-    token,
-    refresh,
-  }: {
-    datasets: Dataset[];
-    token: string;
-    refresh: (
-      token?: string,
-    ) => Promise<void>;
-  }) {
-    const [busy, setBusy] =
+// Dataset import and validation
+function ImportScreen({
+  datasets,
+  token,
+  refresh,
+}: {
+  datasets: Dataset[];
+  token: string;
+  refresh: (
+    token?: string,
+  ) => Promise<void>;
+}) {
+  const [busy, setBusy] =
     useState(false);
 
-    const [pdfReviewOpen, setPdfReviewOpen] =
+  const [pdfReviewOpen, setPdfReviewOpen] =
     useState(false);
 
-    const [locationReviews, setLocationReviews] =
+  const [locationReviews, setLocationReviews] =
     useState<LocationReview[]>([]);
 
-    const [locationOverrides, setLocationOverrides] =
+  const [locationOverrides, setLocationOverrides] =
     useState<
-    Record<
-    string,
-    {
-      latitude: number;
-      longitude: number;
-    }
-    >
+      Record<
+        string,
+        {
+          latitude: number;
+          longitude: number;
+        }
+      >
     >({});
 
-    const [activeLocationIndex, setActiveLocationIndex] =
+  // Keep the selected file alive while the user completes PDF location review.
+  // The import can then be retried without asking the user to pick the PDF again.
+  const [pendingImportAsset, setPendingImportAsset] =
+    useState<any | null>(null);
+
+  const [activeLocationIndex, setActiveLocationIndex] =
     useState(0);
 
-    const [locationLat, setLocationLat] =
+  const [locationLat, setLocationLat] =
     useState("");
 
-    const [locationLng, setLocationLng] =
+  const [locationLng, setLocationLng] =
     useState("");
 
-    const [metadata, setMetadata] =
+  const [metadata, setMetadata] =
     useState({
       data_source: "",
       laboratory_organization: "",
@@ -2959,146 +2964,126 @@ process.env.EXPO_BACKEND_URL ||
       detection_limit: "",
     });
 
-    const updateMetadata = (
-      key: keyof typeof metadata,
-      value: string,
-    ) => {
-      setMetadata((old) => ({
-        ...old,
-        [key]: value,
-      }));
-    };
+  const updateMetadata = (
+    key: keyof typeof metadata,
+    value: string,
+  ) => {
+    setMetadata((old) => ({
+      ...old,
+      [key]: value,
+    }));
+  };
 
-    const metadataComplete = Boolean(
-      metadata.data_source.trim() &&
-      metadata.laboratory_organization.trim() &&
-      metadata.report_id.trim() &&
-      metadata.analytical_method.trim() &&
-      metadata.detection_limit.trim()
-    );
+  const metadataComplete = Boolean(
+    metadata.data_source.trim() &&
+    metadata.laboratory_organization.trim() &&
+    metadata.report_id.trim() &&
+    metadata.analytical_method.trim() &&
+    metadata.detection_limit.trim()
+  );
 
-    const openLocationReview = (
-      locations: LocationReview[],
-    ) => {
-      setLocationReviews(locations);
-      setActiveLocationIndex(0);
+  const openLocationReview = (
+    locations: LocationReview[],
+  ) => {
+    setLocationReviews(locations);
+    setActiveLocationIndex(0);
 
-      const first = locations[0];
-      const existing = first
+    const first = locations[0];
+    const existing = first
       ? locationOverrides[first.location]
       : undefined;
 
-      setLocationLat(
-        existing
+    setLocationLat(
+      existing
         ? String(existing.latitude)
         : "",
-      );
-      setLocationLng(
-        existing
+    );
+    setLocationLng(
+      existing
         ? String(existing.longitude)
         : "",
-      );
-      setPdfReviewOpen(true);
-    };
+    );
+    setPdfReviewOpen(true);
+  };
 
-    const selectReviewLocation = (
-      index: number,
-    ) => {
-      const item = locationReviews[index];
-      setActiveLocationIndex(index);
+  const selectReviewLocation = (
+    index: number,
+  ) => {
+    const item = locationReviews[index];
+    setActiveLocationIndex(index);
 
-      const existing = item
+    const existing = item
       ? locationOverrides[item.location]
       : undefined;
 
-      setLocationLat(
-        existing
+    setLocationLat(
+      existing
         ? String(existing.latitude)
         : "",
-      );
-      setLocationLng(
-        existing
+    );
+    setLocationLng(
+      existing
         ? String(existing.longitude)
         : "",
-      );
-    };
+    );
+  };
 
-    const confirmLocation = () => {
-      const item =
+  const confirmLocation = async () => {
+    const item =
       locationReviews[activeLocationIndex];
 
-      if (!item) return;
+    if (!item) return;
 
-      const latitude = Number(locationLat);
-      const longitude = Number(locationLng);
+    const latitude = Number(locationLat);
+    const longitude = Number(locationLng);
 
-      if (
-        !Number.isFinite(latitude) ||
-        latitude < -90 ||
-        latitude > 90 ||
-        !Number.isFinite(longitude) ||
-        longitude < -180 ||
-        longitude > 180
-      ) {
-        Alert.alert(
-          "Invalid coordinates",
-          "Latitude must be between -90 and 90 and longitude must be between -180 and 180.",
-        );
-        return;
-      }
+    if (
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      Alert.alert(
+        "Invalid coordinates",
+        "Latitude must be between -90 and 90 and longitude must be between -180 and 180.",
+      );
+      return;
+    }
 
-      setLocationOverrides((current) => ({
-        ...current,
-        [item.location]: {
-          latitude,
-          longitude,
-        },
-      }));
+    const nextOverrides = {
+      ...locationOverrides,
+      [item.location]: {
+        latitude,
+        longitude,
+      },
     };
 
-    const activeLocation =
-    locationReviews[activeLocationIndex];
+    setLocationOverrides(nextOverrides);
 
-    const confirmedLocationCount =
-    locationReviews.filter(
-      (item) =>
-      Boolean(
-        locationOverrides[item.location],
-      ),
+    const confirmedCount = locationReviews.filter(
+      (review) => Boolean(nextOverrides[review.location]),
     ).length;
 
-    const importFile = async (
-      types: string[],
-    ) => {
-      console.log("[MetalSense] import button pressed", types);
-
-      if (!metadataComplete) {
+    // Once every unresolved location has coordinates, immediately retry the
+    // original PDF import with the confirmed coordinates.
+    if (
+      confirmedCount === locationReviews.length &&
+      locationReviews.length > 0
+    ) {
+      if (!pendingImportAsset) {
         Alert.alert(
-          "Complete report metadata",
-          "Please fill in Data Source, Laboratory / Organization, Report ID, Analytical Method, and Detection Limit before selecting a file.",
+          "Import file unavailable",
+          "The PDF is no longer available for retry. Please select it again.",
         );
         return;
       }
 
+      setBusy(true);
+      setPdfReviewOpen(false);
+
       try {
-        const result =
-        await DocumentPicker.getDocumentAsync({
-          type: types,
-          copyToCacheDirectory: true,
-          multiple: false,
-        });
-
-        if (
-          result.canceled ||
-          !result.assets?.length
-        ) {
-          return;
-        }
-
-        const asset = result.assets[0];
-
-        setBusy(true);
-
         const formData = new FormData();
 
         Object.entries(metadata).forEach(
@@ -3107,9 +3092,15 @@ process.env.EXPO_BACKEND_URL ||
           },
         );
 
+        formData.append(
+          "location_overrides",
+          JSON.stringify(nextOverrides),
+        );
+
+        const asset = pendingImportAsset;
+
         if (Platform.OS === "web") {
           let file: File | null = null;
-
           const originalFile = (asset as any).file;
 
           if (
@@ -3122,20 +3113,19 @@ process.env.EXPO_BACKEND_URL ||
 
             if (!response.ok) {
               throw new Error(
-                "Unable to read the selected file.",
+                "Unable to read the selected PDF for retry.",
               );
             }
 
             const blob = await response.blob();
-
             file = new File(
               [blob],
-              asset.name || "dataset.csv",
+              asset.name || "dataset.pdf",
               {
                 type:
-                asset.mimeType ||
-                blob.type ||
-                "text/csv",
+                  asset.mimeType ||
+                  blob.type ||
+                  "application/pdf",
               },
             );
           }
@@ -3150,22 +3140,21 @@ process.env.EXPO_BACKEND_URL ||
 
           if (!response.ok) {
             throw new Error(
-              "Unable to read the selected file.",
+              "Unable to read the selected PDF for retry.",
             );
           }
 
           const blob = await response.blob();
-
           formData.append(
             "file",
             blob as any,
-            asset.name || "dataset.csv",
+            asset.name || "dataset.pdf",
           );
         }
 
         console.log(
-          "[MetalSense] sending dataset import request:",
-          asset.name,
+          "[MetalSense] retrying dataset import with confirmed coordinates:",
+          Object.keys(nextOverrides).length,
         );
 
         await api(
@@ -3178,6 +3167,10 @@ process.env.EXPO_BACKEND_URL ||
         );
 
         await refresh(token);
+
+        setLocationReviews([]);
+        setLocationOverrides({});
+        setPendingImportAsset(null);
 
         Alert.alert(
           "Import successful",
@@ -3193,34 +3186,32 @@ process.env.EXPO_BACKEND_URL ||
         });
       } catch (error: any) {
         console.error(
-          "Dataset import failed:",
+          "Dataset retry after location review failed:",
           error,
         );
 
         if (
           error instanceof ApiError &&
           error.status === 422 &&
-          error.body?.detail?.code ===
-          "MISSING_REQUIREMENTS"
+          error.body?.detail?.code === "MISSING_REQUIREMENTS"
         ) {
           const requirements =
-          error.body.detail.requirements ||
-          [];
+            error.body.detail.requirements || [];
 
           const coordinateRequirement =
-          requirements.find(
-            (item: any) =>
-            item?.field ===
-            "coordinates",
-          );
+            requirements.find(
+              (requirement: any) =>
+                requirement?.field === "coordinates",
+            );
 
           const locations =
-          coordinateRequirement?.locations ||
-          [];
+            coordinateRequirement?.locations || [];
 
           if (locations.length > 0) {
-            openLocationReview(
-              locations,
+            openLocationReview(locations);
+            Alert.alert(
+              "More locations need review",
+              "The server still found unresolved locations. Please confirm the remaining coordinates.",
             );
             return;
           }
@@ -3229,69 +3220,278 @@ process.env.EXPO_BACKEND_URL ||
         Alert.alert(
           "Import failed",
           error?.message ||
-          "Could not import the file.",
+          "The dataset could not be imported after coordinate confirmation.",
         );
       } finally {
         setBusy(false);
       }
-    };
 
-    const downloadTemplate = async (format: "csv" | "xlsx") => {
-      try {
-        if (Platform.OS !== "web") {
-          Alert.alert(
-            "Template download",
-            "Template downloads are available in the web application.",
+      return;
+    }
+
+    // Move to the next unresolved location automatically after confirmation.
+    const nextIndex = locationReviews.findIndex(
+      (review, index) =>
+        index > activeLocationIndex &&
+        !nextOverrides[review.location],
+    );
+
+    if (nextIndex >= 0) {
+      selectReviewLocation(nextIndex);
+    }
+  };
+
+  const activeLocation =
+    locationReviews[activeLocationIndex];
+
+  const confirmedLocationCount =
+    locationReviews.filter(
+      (item) =>
+        Boolean(
+          locationOverrides[item.location],
+        ),
+    ).length;
+
+  const importFile = async (
+    types: string[],
+  ) => {
+    console.log("[MetalSense] import button pressed", types);
+
+    if (!metadataComplete) {
+      Alert.alert(
+        "Complete report metadata",
+        "Please fill in Data Source, Laboratory / Organization, Report ID, Analytical Method, and Detection Limit before selecting a file.",
+      );
+      return;
+    }
+
+    try {
+      const result =
+        await DocumentPicker.getDocumentAsync({
+          type: types,
+          copyToCacheDirectory: true,
+          multiple: false,
+        });
+
+      if (
+        result.canceled ||
+        !result.assets?.length
+      ) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      // Preserve the selected file because a PDF may require manual
+      // coordinate confirmation before the import can finish.
+      setPendingImportAsset(asset);
+
+      setBusy(true);
+
+      const formData = new FormData();
+
+      Object.entries(metadata).forEach(
+        ([key, value]) => {
+          formData.append(key, String(value));
+        },
+      );
+
+      if (Object.keys(locationOverrides).length > 0) {
+        formData.append(
+          "location_overrides",
+          JSON.stringify(locationOverrides),
+        );
+      }
+
+      if (Platform.OS === "web") {
+        let file: File | null = null;
+
+        const originalFile = (asset as any).file;
+
+        if (
+          typeof File !== "undefined" &&
+          originalFile instanceof File
+        ) {
+          file = originalFile;
+        } else {
+          const response = await fetch(asset.uri);
+
+          if (!response.ok) {
+            throw new Error(
+              "Unable to read the selected file.",
+            );
+          }
+
+          const blob = await response.blob();
+
+          file = new File(
+            [blob],
+            asset.name || "dataset.csv",
+            {
+              type:
+                asset.mimeType ||
+                blob.type ||
+                "text/csv",
+            },
+          );
+        }
+
+        formData.append(
+          "file",
+          file,
+          file.name,
+        );
+      } else {
+        const response = await fetch(asset.uri);
+
+        if (!response.ok) {
+          throw new Error(
+            "Unable to read the selected file.",
+          );
+        }
+
+        const blob = await response.blob();
+
+        formData.append(
+          "file",
+          blob as any,
+          asset.name || "dataset.csv",
+        );
+      }
+
+      console.log(
+        "[MetalSense] sending dataset import request:",
+        asset.name,
+      );
+
+      await api(
+        "/datasets/import",
+        {
+          method: "POST",
+          body: formData,
+        },
+        token,
+      );
+
+      await refresh(token);
+
+      setPendingImportAsset(null);
+      setLocationReviews([]);
+      setLocationOverrides({});
+
+      Alert.alert(
+        "Import successful",
+        `${asset.name || "Dataset"} was validated and added to your workspace.`,
+      );
+
+      setMetadata({
+        data_source: "",
+        laboratory_organization: "",
+        report_id: "",
+        analytical_method: "",
+        detection_limit: "",
+      });
+    } catch (error: any) {
+      console.error(
+        "Dataset import failed:",
+        error,
+      );
+
+      if (
+        error instanceof ApiError &&
+        error.status === 422 &&
+        error.body?.detail?.code ===
+        "MISSING_REQUIREMENTS"
+      ) {
+        const requirements =
+          error.body.detail.requirements ||
+          [];
+
+        const coordinateRequirement =
+          requirements.find(
+            (item: any) =>
+              item?.field ===
+              "coordinates",
+          );
+
+        const locations =
+          coordinateRequirement?.locations ||
+          [];
+
+        if (locations.length > 0) {
+          openLocationReview(
+            locations,
           );
           return;
         }
-
-        if (format === "csv") {
-          const csvRows = [
-            TEMPLATE_HEADERS.join(","),
-            TEMPLATE_SAMPLE_ROW.map((value) => {
-              const text = String(value);
-              return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-            }).join(","),
-          ];
-          const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8" });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = "MetalSense_Water_Quality_Template.csv";
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          URL.revokeObjectURL(url);
-        } else {
-          const workbook = XLSX.utils.book_new();
-          const worksheet = XLSX.utils.aoa_to_sheet([
-            TEMPLATE_HEADERS,
-            TEMPLATE_SAMPLE_ROW,
-          ]);
-          XLSX.utils.book_append_sheet(workbook, worksheet, "Water Quality Template");
-          const output = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-          const blob = new Blob([output], {
-            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = "MetalSense_Water_Quality_Template.xlsx";
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          URL.revokeObjectURL(url);
-        }
-      } catch (error: any) {
-        Alert.alert(
-          "Template download failed",
-          error?.message || "Unable to download the template.",
-        );
       }
-    };
 
-    const removeDataset =
+      Alert.alert(
+        "Import failed",
+        error?.message ||
+        "Could not import the file.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadTemplate = async (format: "csv" | "xlsx") => {
+    try {
+      if (Platform.OS !== "web") {
+        Alert.alert(
+          "Template download",
+          "Template downloads are available in the web application.",
+        );
+        return;
+      }
+
+      if (format === "csv") {
+        const csvRows = [
+          TEMPLATE_HEADERS.join(","),
+          TEMPLATE_SAMPLE_ROW.map((value) => {
+            const text = String(value);
+            return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+          }).join(","),
+        ];
+        const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "MetalSense_Water_Quality_Template.csv";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.aoa_to_sheet([
+          TEMPLATE_HEADERS,
+          TEMPLATE_SAMPLE_ROW,
+        ]);
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Water Quality Template");
+        const output = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+        const blob = new Blob([output], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "MetalSense_Water_Quality_Template.xlsx";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error: any) {
+      Alert.alert(
+        "Template download failed",
+        error?.message || "Unable to download the template.",
+      );
+    }
+  };
+
+  const removeDataset =
     async (
       id: string,
     ) => {
@@ -3314,1160 +3514,1160 @@ process.env.EXPO_BACKEND_URL ||
       }
     };
 
-    return (
-      <View>
+  return (
+    <View>
       <PageIntro
-      eyebrow="EVIDENCE INTAKE"
-      title="Import monitoring data"
-      description="Attach traceable laboratory and source metadata before importing CSV, Excel, or PDF monitoring data."
+        eyebrow="EVIDENCE INTAKE"
+        title="Import monitoring data"
+        description="Attach traceable laboratory and source metadata before importing CSV, Excel, or PDF monitoring data."
       />
 
       <View style={styles.templatePanel}>
-      <Text style={styles.panelTitle}>
-      Data Template
-      </Text>
-      <Text style={styles.panelSubtitle}>
-      Download a standardized template to prepare your water quality dataset before import.
-      </Text>
+        <Text style={styles.panelTitle}>
+          Data Template
+        </Text>
+        <Text style={styles.panelSubtitle}>
+          Download a standardized template to prepare your water quality dataset before import.
+        </Text>
 
-      <View style={styles.templateDownloadSection}>
-      <Text style={styles.templateDownloadTitle}>
-      Download templates
-      </Text>
-      <Text style={styles.templateDownloadText}>
-      Use the standardized water quality format for your dataset.
-      </Text>
+        <View style={styles.templateDownloadSection}>
+          <Text style={styles.templateDownloadTitle}>
+            Download templates
+          </Text>
+          <Text style={styles.templateDownloadText}>
+            Use the standardized water quality format for your dataset.
+          </Text>
 
-      <View style={styles.templateDownloadRow}>
-      <Pressable
-      style={({ pressed }) => [
-        styles.templateDownloadButton,
-        pressed && { opacity: 0.82 },
-      ]}
-      onPress={() => downloadTemplate("csv")}
-      >
-      <View style={styles.templateDownloadIcon}>
-      <Ionicons
-      name="download-outline"
-      size={20}
-      color={C.green}
-      />
-      </View>
-      <View style={{ flex: 1 }}>
-      <Text style={styles.templateDownloadButtonTitle}>
-      Download CSV Template
-      </Text>
-      <Text style={styles.templateDownloadButtonText}>
-      Standardized .csv template
-      </Text>
-      </View>
-      <Ionicons
-      name="arrow-down-circle-outline"
-      size={21}
-      color={C.green}
-      />
-      </Pressable>
+          <View style={styles.templateDownloadRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.templateDownloadButton,
+                pressed && { opacity: 0.82 },
+              ]}
+              onPress={() => downloadTemplate("csv")}
+            >
+              <View style={styles.templateDownloadIcon}>
+                <Ionicons
+                  name="download-outline"
+                  size={20}
+                  color={C.green}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.templateDownloadButtonTitle}>
+                  Download CSV Template
+                </Text>
+                <Text style={styles.templateDownloadButtonText}>
+                  Standardized .csv template
+                </Text>
+              </View>
+              <Ionicons
+                name="arrow-down-circle-outline"
+                size={21}
+                color={C.green}
+              />
+            </Pressable>
 
-      <Pressable
-      style={({ pressed }) => [
-        styles.templateDownloadButton,
-        pressed && { opacity: 0.82 },
-      ]}
-      onPress={() => downloadTemplate("xlsx")}
-      >
-      <View style={styles.templateDownloadIcon}>
-      <Ionicons
-      name="grid-outline"
-      size={20}
-      color={C.teal}
-      />
-      </View>
-      <View style={{ flex: 1 }}>
-      <Text style={styles.templateDownloadButtonTitle}>
-      Download Excel Template
-      </Text>
-      <Text style={styles.templateDownloadButtonText}>
-      Standardized .xlsx template
-      </Text>
-      </View>
-      <Ionicons
-      name="arrow-down-circle-outline"
-      size={21}
-      color={C.teal}
-      />
-      </Pressable>
-      </View>
-      </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.templateDownloadButton,
+                pressed && { opacity: 0.82 },
+              ]}
+              onPress={() => downloadTemplate("xlsx")}
+            >
+              <View style={styles.templateDownloadIcon}>
+                <Ionicons
+                  name="grid-outline"
+                  size={20}
+                  color={C.teal}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.templateDownloadButtonTitle}>
+                  Download Excel Template
+                </Text>
+                <Text style={styles.templateDownloadButtonText}>
+                  Standardized .xlsx template
+                </Text>
+              </View>
+              <Ionicons
+                name="arrow-down-circle-outline"
+                size={21}
+                color={C.teal}
+              />
+            </Pressable>
+          </View>
+        </View>
       </View>
 
       <View style={styles.panel}>
-      <Text style={styles.panelTitle}>
-      Report metadata
-      </Text>
-      <Text style={styles.panelSubtitle}>
-      These fields are sent with the dataset import and should be persisted by the backend.
-      </Text>
+        <Text style={styles.panelTitle}>
+          Report metadata
+        </Text>
+        <Text style={styles.panelSubtitle}>
+          These fields are sent with the dataset import and should be persisted by the backend.
+        </Text>
 
-      <View style={styles.metadataGrid}>
-      <Field
-      label="DATA SOURCE *"
-      value={metadata.data_source}
-      onChangeText={(value) =>
-        updateMetadata("data_source", value)
-      }
-      placeholder="Field survey / Laboratory"
-      compact
-      />
-      <Field
-      label="LABORATORY / ORGANIZATION *"
-      value={metadata.laboratory_organization}
-      onChangeText={(value) =>
-        updateMetadata(
-          "laboratory_organization",
-          value,
-        )
-      }
-      placeholder="Laboratory or organization name"
-      compact
-      />
-      <Field
-      label="REPORT ID *"
-      value={metadata.report_id}
-      onChangeText={(value) =>
-        updateMetadata("report_id", value)
-      }
-      placeholder="Report / certificate ID"
-      compact
-      />
-      <Field
-      label="ANALYTICAL METHOD *"
-      value={metadata.analytical_method}
-      onChangeText={(value) =>
-        updateMetadata(
-          "analytical_method",
-          value,
-        )
-      }
-      placeholder="ICP-MS / AAS / other"
-      compact
-      />
-      <Field
-      label="DETECTION LIMIT *"
-      value={metadata.detection_limit}
-      onChangeText={(value) =>
-        updateMetadata(
-          "detection_limit",
-          value,
-        )
-      }
-      placeholder="e.g. 0.001 mg/L"
-      compact
-      />
-      </View>
+        <View style={styles.metadataGrid}>
+          <Field
+            label="DATA SOURCE *"
+            value={metadata.data_source}
+            onChangeText={(value) =>
+              updateMetadata("data_source", value)
+            }
+            placeholder="Field survey / Laboratory"
+            compact
+          />
+          <Field
+            label="LABORATORY / ORGANIZATION *"
+            value={metadata.laboratory_organization}
+            onChangeText={(value) =>
+              updateMetadata(
+                "laboratory_organization",
+                value,
+              )
+            }
+            placeholder="Laboratory or organization name"
+            compact
+          />
+          <Field
+            label="REPORT ID *"
+            value={metadata.report_id}
+            onChangeText={(value) =>
+              updateMetadata("report_id", value)
+            }
+            placeholder="Report / certificate ID"
+            compact
+          />
+          <Field
+            label="ANALYTICAL METHOD *"
+            value={metadata.analytical_method}
+            onChangeText={(value) =>
+              updateMetadata(
+                "analytical_method",
+                value,
+              )
+            }
+            placeholder="ICP-MS / AAS / other"
+            compact
+          />
+          <Field
+            label="DETECTION LIMIT *"
+            value={metadata.detection_limit}
+            onChangeText={(value) =>
+              updateMetadata(
+                "detection_limit",
+                value,
+              )
+            }
+            placeholder="e.g. 0.001 mg/L"
+            compact
+          />
+        </View>
       </View>
 
       {busy && (
         <View style={styles.loadingBanner}>
-        <ActivityIndicator color={C.green} />
-        <Text style={styles.loadingText}>
-        Importing dataset…
-        </Text>
+          <ActivityIndicator color={C.green} />
+          <Text style={styles.loadingText}>
+            Importing dataset…
+          </Text>
         </View>
       )}
 
       {!metadataComplete ? (
         <View style={styles.importLockedBanner}>
-        <View style={styles.importLockedIcon}>
-        <Ionicons
-        name="lock-closed-outline"
-        size={18}
-        color={C.warning}
-        />
-        </View>
-        <View style={{ flex: 1 }}>
-        <Text style={styles.importLockedTitle}>
-        File import is locked
-        </Text>
-        <Text style={styles.importLockedText}>
-        Complete all 5 required metadata fields before selecting a CSV or Excel file.
-        </Text>
-        </View>
+          <View style={styles.importLockedIcon}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={18}
+              color={C.warning}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.importLockedTitle}>
+              File import is locked
+            </Text>
+            <Text style={styles.importLockedText}>
+              Complete all 5 required metadata fields before selecting a CSV or Excel file.
+            </Text>
+          </View>
         </View>
       ) : (
         <View style={styles.importReadyBanner}>
-        <View style={styles.importReadyIcon}>
-        <Ionicons
-        name="checkmark-circle-outline"
-        size={18}
-        color={C.green}
-        />
-        </View>
-        <Text style={styles.importReadyText}>
-        Required metadata complete. You can now import a file.
-        </Text>
+          <View style={styles.importReadyIcon}>
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={18}
+              color={C.green}
+            />
+          </View>
+          <Text style={styles.importReadyText}>
+            Required metadata complete. You can now import a file.
+          </Text>
         </View>
       )}
 
       <View style={styles.importChoiceRow}>
-      <ImportChoice
-      icon="document-text-outline"
-      title="IMPORT CSV"
-      subtitle="Comma-separated values"
-      disabled={!metadataComplete || busy}
-      onPress={() =>
-        importFile([
-          "text/csv",
-          ".csv",
-        ])
-      }
-      />
-
-      <ImportChoice
-      icon="document-outline"
-      title="IMPORT PDF"
-      subtitle="Water quality report / PDF dataset"
-      disabled={
-        !metadataComplete ||
-        busy
-      }
-      onPress={() =>
-        importFile([
-          "application/pdf",
-          ".pdf",
-        ])
-      }
-      />
-
-      <ImportChoice
-      icon="grid-outline"
-      title="IMPORT EXCEL"
-      subtitle=".xlsx or .xls workbook"
-      disabled={!metadataComplete || busy}
-      onPress={() =>
-        importFile([
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "application/vnd.ms-excel",
-          ".xlsx",
-          ".xls",
-        ])
-      }
-      />
-      </View>
-
-      <View style={styles.panel}>
-      <Text style={styles.panelTitle}>
-      Imported sample files
-      </Text>
-
-      <Text style={styles.panelSubtitle}>
-      Persisted in your workspace
-      </Text>
-
-      {datasets.length === 0 ? (
-        <EmptyState
-        icon="documents-outline"
-        title="No imported files"
-        text="Choose CSV, Excel, or PDF above."
+        <ImportChoice
+          icon="document-text-outline"
+          title="IMPORT CSV"
+          subtitle="Comma-separated values"
+          disabled={!metadataComplete || busy}
+          onPress={() =>
+            importFile([
+              "text/csv",
+              ".csv",
+            ])
+          }
         />
-      ) : (
-        datasets.map((dataset) => (
-          <View
-          style={styles.datasetItem}
-          key={dataset.dataset_id}
-          >
-          <Ionicons
-          name="documents-outline"
-          size={23}
-          color={C.teal}
-          />
 
-          <View style={{ flex: 1 }}>
-          <Text style={styles.datasetName}>
-          {dataset.filename}
-          </Text>
+        <ImportChoice
+          icon="document-outline"
+          title="IMPORT PDF"
+          subtitle="Water quality report / PDF dataset"
+          disabled={
+            !metadataComplete ||
+            busy
+          }
+          onPress={() =>
+            importFile([
+              "application/pdf",
+              ".pdf",
+            ])
+          }
+        />
 
-          <Text style={styles.datasetMeta}>
-          {dataset.records?.length || 0} records ·{" "}
-          {dataset.columns?.length || 0} columns ·{" "}
-          {prettyDate(dataset.imported_at)}
-          </Text>
-
-          <Text style={styles.datasetMeta}>
-          {dataset.data_source || "Source not provided"} ·{" "}
-          {dataset.report_id || "Report ID not provided"}
-          </Text>
-          </View>
-
-          <View style={styles.datasetScore}>
-          <Text style={styles.datasetScoreValue}>
-          {Math.round(
-            dataset.quality?.score ?? 0,
-          )}
-          </Text>
-          <Text style={styles.datasetScoreLabel}>
-          {dataset.source_type ===
-            "metalsense_export"
-            ? "integrity"
-            : "quality"}
-            </Text>
-            </View>
-
-            <Pressable
-            onPress={() =>
-              removeDataset(
-                dataset.dataset_id,
-              )
-            }
-            style={{ padding: 8 }}
-            >
-            <Ionicons
-            name="trash-outline"
-            size={20}
-            color={C.danger}
-            />
-            </Pressable>
-            </View>
-        ))
-      )}
+        <ImportChoice
+          icon="grid-outline"
+          title="IMPORT EXCEL"
+          subtitle=".xlsx or .xls workbook"
+          disabled={!metadataComplete || busy}
+          onPress={() =>
+            importFile([
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/vnd.ms-excel",
+              ".xlsx",
+              ".xls",
+            ])
+          }
+        />
       </View>
 
       <View style={styles.panel}>
-      <Text style={styles.panelTitle}>
-      Required fields
-      </Text>
+        <Text style={styles.panelTitle}>
+          Imported sample files
+        </Text>
 
-      <Text style={styles.panelSubtitle}>
-      The dataset must contain these signals
-      </Text>
+        <Text style={styles.panelSubtitle}>
+          Persisted in your workspace
+        </Text>
 
-      <Text style={styles.bullet}>
-      • latitude / lat and longitude / lon / lng
-      </Text>
+        {datasets.length === 0 ? (
+          <EmptyState
+            icon="documents-outline"
+            title="No imported files"
+            text="Choose CSV, Excel, or PDF above."
+          />
+        ) : (
+          datasets.map((dataset) => (
+            <View
+              style={styles.datasetItem}
+              key={dataset.dataset_id}
+            >
+              <Ionicons
+                name="documents-outline"
+                size={23}
+                color={C.teal}
+              />
 
-      <Text style={styles.bullet}>
-      • at least one supported metal: Pb, Cd, As, Cr, Hg, Ni, Cu, Zn, Fe, Mn
-      </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.datasetName}>
+                  {dataset.filename}
+                </Text>
 
-      <Text style={styles.bullet}>
-      • optional: sample ID, date/time, water body or uploaded location fields
-      </Text>
+                <Text style={styles.datasetMeta}>
+                  {dataset.records?.length || 0} records ·{" "}
+                  {dataset.columns?.length || 0} columns ·{" "}
+                  {prettyDate(dataset.imported_at)}
+                </Text>
+
+                <Text style={styles.datasetMeta}>
+                  {dataset.data_source || "Source not provided"} ·{" "}
+                  {dataset.report_id || "Report ID not provided"}
+                </Text>
+              </View>
+
+              <View style={styles.datasetScore}>
+                <Text style={styles.datasetScoreValue}>
+                  {Math.round(
+                    dataset.quality?.score ?? 0,
+                  )}
+                </Text>
+                <Text style={styles.datasetScoreLabel}>
+                  {dataset.source_type ===
+                    "metalsense_export"
+                    ? "integrity"
+                    : "quality"}
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() =>
+                  removeDataset(
+                    dataset.dataset_id,
+                  )
+                }
+                style={{ padding: 8 }}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={20}
+                  color={C.danger}
+                />
+              </Pressable>
+            </View>
+          ))
+        )}
+      </View>
+
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>
+          Required fields
+        </Text>
+
+        <Text style={styles.panelSubtitle}>
+          The dataset must contain these signals
+        </Text>
+
+        <Text style={styles.bullet}>
+          • latitude / lat and longitude / lon / lng
+        </Text>
+
+        <Text style={styles.bullet}>
+          • at least one supported metal: Pb, Cd, As, Cr, Hg, Ni, Cu, Zn, Fe, Mn
+        </Text>
+
+        <Text style={styles.bullet}>
+          • optional: sample ID, date/time, water body or uploaded location fields
+        </Text>
       </View>
 
       <Modal
-      visible={pdfReviewOpen}
-      transparent
-      animationType="fade"
-      onRequestClose={() =>
-        setPdfReviewOpen(false)
-      }
+        visible={pdfReviewOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setPdfReviewOpen(false)
+        }
       >
-      <View
-      style={{
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.55)",
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.55)",
             justifyContent: "center",
             alignItems: "center",
             padding: 20,
-      }}
-      >
-      <View
-      style={{
-        width: "100%",
-        maxWidth: 980,
-        maxHeight: "90%",
-        backgroundColor: C.surface,
-        borderRadius: 22,
-        overflow: "hidden",
-        borderWidth: 1,
-        borderColor: C.border,
-      }}
-      >
-      <View
-      style={{
-        padding: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: C.border,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-      >
-      <View style={{ flex: 1 }}>
-      <Text
-      style={{
-        color: C.text,
-        fontSize: 21,
-        fontWeight: "800",
-      }}
-      >
-      Location Review
-      </Text>
-      <Text
-      style={{
-        color: C.muted,
-        marginTop: 5,
-        fontSize: 13,
-      }}
-      >
-      {confirmedLocationCount} of{" "}
-      {locationReviews.length} locations confirmed
-      </Text>
-      </View>
-
-      <Pressable
-      onPress={() =>
-        setPdfReviewOpen(false)
-      }
-      style={{
-        width: 38,
-        height: 38,
-        borderRadius: 19,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: C.mint2,
-      }}
-      >
-      <Ionicons
-      name="close"
-      size={22}
-      color={C.text}
-      />
-      </Pressable>
-      </View>
-
-      <View
-      style={{
-        flex: 1,
-        flexDirection:
-        Dimensions.get("window").width >= 760
-        ? "row"
-        : "column",
-      }}
-      >
-      <View
-      style={{
-        width:
-        Dimensions.get("window").width >= 760
-        ? 330
-        : "100%",
-        maxHeight:
-        Dimensions.get("window").width >= 760
-        ? undefined
-        : 220,
-        borderRightWidth:
-        Dimensions.get("window").width >= 760
-        ? 1
-        : 0,
-        borderBottomWidth:
-        Dimensions.get("window").width >= 760
-        ? 0
-        : 1,
-        borderColor: C.border,
-      }}
-      >
-      <ScrollView
-      contentContainerStyle={{
-        padding: 14,
-      }}
-      >
-      {locationReviews.map(
-        (item, index) => {
-          const confirmed =
-          Boolean(
-            locationOverrides[
-              item.location
-            ],
-          );
-
-          return (
-            <Pressable
-            key={`${item.location}-${index}`}
-            onPress={() =>
-              selectReviewLocation(index)
-            }
-            style={{
-              padding: 13,
-              marginBottom: 8,
-              borderRadius: 14,
-              borderWidth: 1,
-              borderColor:
-              index ===
-              activeLocationIndex
-              ? C.teal
-              : C.border,
-              backgroundColor:
-              index ===
-              activeLocationIndex
-              ? C.mint2
-              : C.surface,
-            }}
-            >
-            <View
-            style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
-            }}
-            >
-            <Ionicons
-            name={
-              confirmed
-              ? "checkmark-circle"
-              : "location-outline"
-            }
-            size={18}
-            color={
-              confirmed
-              ? C.green
-              : C.warning
-            }
-            />
-            <Text
-            numberOfLines={3}
-            style={{
-              flex: 1,
-              marginLeft: 8,
-              color: C.text,
-              fontSize: 13,
-              fontWeight: "700",
-            }}
-            >
-            {item.location}
-            </Text>
-            </View>
-
-            <Text
-            style={{
-              color: C.muted,
-              fontSize: 11,
-              marginTop: 6,
-              marginLeft: 26,
-            }}
-            >
-            {[
-              item.region,
-              item.country,
-            ]
-            .filter(Boolean)
-            .join(" · ") ||
-            "Location context unavailable"}
-            </Text>
-            </Pressable>
-          );
-        },
-      )}
-      </ScrollView>
-      </View>
-
-      <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{
-        padding: 22,
-      }}
-      >
-      {activeLocation ? (
-        <>
-        <Text
-        style={{
-          color: C.teal,
-          fontSize: 10,
-          fontWeight: "800",
-          letterSpacing: 0.8,
-        }}
+          }}
         >
-        SAMPLING LOCATION
-        </Text>
-
-        <Text
-        style={{
-          color: C.text,
-          fontSize: 23,
-          fontWeight: "800",
-          marginTop: 10,
-        }}
-        >
-        {activeLocation.location}
-        </Text>
-
-        <Text
-        style={{
-          color: C.muted,
-          fontSize: 13,
-          lineHeight: 20,
-          marginTop: 8,
-        }}
-        >
-        {activeLocation.reason ||
-          "Coordinates could not be resolved automatically."}
-          </Text>
-
           <View
-          style={{
-            marginTop: 18,
-            padding: 15,
-            borderRadius: 15,
-            backgroundColor: C.mint2,
-            borderWidth: 1,
-            borderColor: C.border,
-          }}
-          >
-          <Text
-          style={{
-            color: C.muted,
-            fontSize: 10,
-            fontWeight: "800",
-          }}
-          >
-          SUGGESTED SEARCH
-          </Text>
-          <Text
-          style={{
-            color: C.text,
-            fontSize: 14,
-            fontWeight: "600",
-            marginTop: 7,
-            lineHeight: 21,
-          }}
-          >
-          {activeLocation.suggested_query ||
-            activeLocation.location}
-            </Text>
-            </View>
-
-            <View
             style={{
-              flexDirection: "row",
-              marginTop: 18,
-            }}
-            >
-            <View
-            style={{
-              flex: 1,
-              marginRight: 6,
-            }}
-            >
-            <Text
-            style={{
-              color: C.text,
-              fontSize: 11,
-              fontWeight: "800",
-              marginBottom: 7,
-            }}
-            >
-            LATITUDE
-            </Text>
-            <TextInput
-            value={locationLat}
-            onChangeText={setLocationLat}
-            keyboardType="numeric"
-            placeholder="19.0760"
-            placeholderTextColor={C.muted2}
-            style={{
-              borderWidth: 1,
-              borderColor: C.border,
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 12,
-              color: C.text,
+              width: "100%",
+              maxWidth: 980,
+              maxHeight: "90%",
               backgroundColor: C.surface,
+              borderRadius: 22,
+              overflow: "hidden",
+              borderWidth: 1,
+              borderColor: C.border,
             }}
-            />
+          >
+            <View
+              style={{
+                padding: 20,
+                borderBottomWidth: 1,
+                borderBottomColor: C.border,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: C.text,
+                    fontSize: 21,
+                    fontWeight: "800",
+                  }}
+                >
+                  Location Review
+                </Text>
+                <Text
+                  style={{
+                    color: C.muted,
+                    marginTop: 5,
+                    fontSize: 13,
+                  }}
+                >
+                  {confirmedLocationCount} of{" "}
+                  {locationReviews.length} locations confirmed
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() =>
+                  setPdfReviewOpen(false)
+                }
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 19,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  backgroundColor: C.mint2,
+                }}
+              >
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color={C.text}
+                />
+              </Pressable>
             </View>
 
             <View
-            style={{
-              flex: 1,
-              marginLeft: 6,
-            }}
+              style={{
+                flex: 1,
+                flexDirection:
+                  Dimensions.get("window").width >= 760
+                    ? "row"
+                    : "column",
+              }}
             >
-            <Text
-            style={{
-              color: C.text,
-              fontSize: 11,
-              fontWeight: "800",
-              marginBottom: 7,
-            }}
-            >
-            LONGITUDE
-            </Text>
-            <TextInput
-            value={locationLng}
-            onChangeText={setLocationLng}
-            keyboardType="numeric"
-            placeholder="72.8777"
-            placeholderTextColor={C.muted2}
-            style={{
-              borderWidth: 1,
-              borderColor: C.border,
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 12,
-              color: C.text,
-              backgroundColor: C.surface,
-            }}
-            />
-            </View>
+              <View
+                style={{
+                  width:
+                    Dimensions.get("window").width >= 760
+                      ? 330
+                      : "100%",
+                  maxHeight:
+                    Dimensions.get("window").width >= 760
+                      ? undefined
+                      : 220,
+                  borderRightWidth:
+                    Dimensions.get("window").width >= 760
+                      ? 1
+                      : 0,
+                  borderBottomWidth:
+                    Dimensions.get("window").width >= 760
+                      ? 0
+                      : 1,
+                  borderColor: C.border,
+                }}
+              >
+                <ScrollView
+                  contentContainerStyle={{
+                    padding: 14,
+                  }}
+                >
+                  {locationReviews.map(
+                    (item, index) => {
+                      const confirmed =
+                        Boolean(
+                          locationOverrides[
+                          item.location
+                          ],
+                        );
+
+                      return (
+                        <Pressable
+                          key={`${item.location}-${index}`}
+                          onPress={() =>
+                            selectReviewLocation(index)
+                          }
+                          style={{
+                            padding: 13,
+                            marginBottom: 8,
+                            borderRadius: 14,
+                            borderWidth: 1,
+                            borderColor:
+                              index ===
+                                activeLocationIndex
+                                ? C.teal
+                                : C.border,
+                            backgroundColor:
+                              index ===
+                                activeLocationIndex
+                                ? C.mint2
+                                : C.surface,
+                          }}
+                        >
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <Ionicons
+                              name={
+                                confirmed
+                                  ? "checkmark-circle"
+                                  : "location-outline"
+                              }
+                              size={18}
+                              color={
+                                confirmed
+                                  ? C.green
+                                  : C.warning
+                              }
+                            />
+                            <Text
+                              numberOfLines={3}
+                              style={{
+                                flex: 1,
+                                marginLeft: 8,
+                                color: C.text,
+                                fontSize: 13,
+                                fontWeight: "700",
+                              }}
+                            >
+                              {item.location}
+                            </Text>
+                          </View>
+
+                          <Text
+                            style={{
+                              color: C.muted,
+                              fontSize: 11,
+                              marginTop: 6,
+                              marginLeft: 26,
+                            }}
+                          >
+                            {[
+                              item.region,
+                              item.country,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") ||
+                              "Location context unavailable"}
+                          </Text>
+                        </Pressable>
+                      );
+                    },
+                  )}
+                </ScrollView>
+              </View>
+
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                  padding: 22,
+                }}
+              >
+                {activeLocation ? (
+                  <>
+                    <Text
+                      style={{
+                        color: C.teal,
+                        fontSize: 10,
+                        fontWeight: "800",
+                        letterSpacing: 0.8,
+                      }}
+                    >
+                      SAMPLING LOCATION
+                    </Text>
+
+                    <Text
+                      style={{
+                        color: C.text,
+                        fontSize: 23,
+                        fontWeight: "800",
+                        marginTop: 10,
+                      }}
+                    >
+                      {activeLocation.location}
+                    </Text>
+
+                    <Text
+                      style={{
+                        color: C.muted,
+                        fontSize: 13,
+                        lineHeight: 20,
+                        marginTop: 8,
+                      }}
+                    >
+                      {activeLocation.reason ||
+                        "Coordinates could not be resolved automatically."}
+                    </Text>
+
+                    <View
+                      style={{
+                        marginTop: 18,
+                        padding: 15,
+                        borderRadius: 15,
+                        backgroundColor: C.mint2,
+                        borderWidth: 1,
+                        borderColor: C.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: C.muted,
+                          fontSize: 10,
+                          fontWeight: "800",
+                        }}
+                      >
+                        SUGGESTED SEARCH
+                      </Text>
+                      <Text
+                        style={{
+                          color: C.text,
+                          fontSize: 14,
+                          fontWeight: "600",
+                          marginTop: 7,
+                          lineHeight: 21,
+                        }}
+                      >
+                        {activeLocation.suggested_query ||
+                          activeLocation.location}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        marginTop: 18,
+                      }}
+                    >
+                      <View
+                        style={{
+                          flex: 1,
+                          marginRight: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: C.text,
+                            fontSize: 11,
+                            fontWeight: "800",
+                            marginBottom: 7,
+                          }}
+                        >
+                          LATITUDE
+                        </Text>
+                        <TextInput
+                          value={locationLat}
+                          onChangeText={setLocationLat}
+                          keyboardType="numeric"
+                          placeholder="19.0760"
+                          placeholderTextColor={C.muted2}
+                          style={{
+                            borderWidth: 1,
+                            borderColor: C.border,
+                            borderRadius: 12,
+                            paddingHorizontal: 12,
+                            paddingVertical: 12,
+                            color: C.text,
+                            backgroundColor: C.surface,
+                          }}
+                        />
+                      </View>
+
+                      <View
+                        style={{
+                          flex: 1,
+                          marginLeft: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: C.text,
+                            fontSize: 11,
+                            fontWeight: "800",
+                            marginBottom: 7,
+                          }}
+                        >
+                          LONGITUDE
+                        </Text>
+                        <TextInput
+                          value={locationLng}
+                          onChangeText={setLocationLng}
+                          keyboardType="numeric"
+                          placeholder="72.8777"
+                          placeholderTextColor={C.muted2}
+                          style={{
+                            borderWidth: 1,
+                            borderColor: C.border,
+                            borderRadius: 12,
+                            paddingHorizontal: 12,
+                            paddingVertical: 12,
+                            color: C.text,
+                            backgroundColor: C.surface,
+                          }}
+                        />
+                      </View>
+                    </View>
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        marginTop: 18,
+                      }}
+                    >
+                      <Pressable
+                        onPress={() => {
+                          if (
+                            Platform.OS === "web" &&
+                            typeof window !== "undefined"
+                          ) {
+                            window.open(
+                              `https://www.openstreetmap.org/search?query=${encodeURIComponent(
+                                activeLocation.suggested_query ||
+                                activeLocation.location,
+                              )}`,
+                              "_blank",
+                            );
+                          } else {
+                            Alert.alert(
+                              "Map search",
+                              "Search the suggested location in your map application.",
+                            );
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          marginRight: 6,
+                          paddingVertical: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: C.border,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: C.text,
+                            fontWeight: "700",
+                          }}
+                        >
+                          Search Map
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={confirmLocation}
+                        style={{
+                          flex: 1,
+                          marginLeft: 6,
+                          paddingVertical: 12,
+                          borderRadius: 12,
+                          backgroundColor: C.green,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: C.white,
+                            fontWeight: "800",
+                          }}
+                        >
+                          Confirm Coordinates
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                ) : (
+                  <View
+                    style={{
+                      alignItems: "center",
+                      paddingVertical: 80,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: C.text,
+                        fontWeight: "800",
+                      }}
+                    >
+                      Select a location
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
             </View>
 
             <View
-            style={{
-              flexDirection: "row",
-              marginTop: 18,
-            }}
+              style={{
+                padding: 16,
+                borderTopWidth: 1,
+                borderTopColor: C.border,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
             >
-            <Pressable
-            onPress={() => {
-              if (
-                Platform.OS === "web" &&
-                typeof window !== "undefined"
-              ) {
-                window.open(
-                  `https://www.openstreetmap.org/search?query=${encodeURIComponent(
-                    activeLocation.suggested_query ||
-                    activeLocation.location,
-                  )}`,
-                  "_blank",
-                );
-              } else {
-                Alert.alert(
-                  "Map search",
-                  "Search the suggested location in your map application.",
-                );
-              }
-            }}
-            style={{
-              flex: 1,
-              marginRight: 6,
-              paddingVertical: 12,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: C.border,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-            >
-            <Text
-            style={{
-              color: C.text,
-              fontWeight: "700",
-            }}
-            >
-            Search Map
-            </Text>
-            </Pressable>
+              <Text
+                style={{
+                  flex: 1,
+                  color: C.muted,
+                  fontSize: 12,
+                }}
+              >
+                {locationReviews.length -
+                  confirmedLocationCount}{" "}
+                locations still need review
+              </Text>
 
-            <Pressable
-            onPress={confirmLocation}
-            style={{
-              flex: 1,
-              marginLeft: 6,
-              paddingVertical: 12,
-              borderRadius: 12,
-              backgroundColor: C.green,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-            >
-            <Text
-            style={{
-              color: C.white,
-              fontWeight: "800",
-            }}
-            >
-            Confirm Coordinates
-            </Text>
-            </Pressable>
+              <Pressable
+                onPress={() =>
+                  setPdfReviewOpen(false)
+                }
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 11,
+                  borderRadius: 11,
+                  backgroundColor: C.mint2,
+                }}
+              >
+                <Text
+                  style={{
+                    color: C.text,
+                    fontWeight: "800",
+                  }}
+                >
+                  Review Later
+                </Text>
+              </Pressable>
             </View>
-            </>
-      ) : (
-        <View
-        style={{
-          alignItems: "center",
-          paddingVertical: 80,
-        }}
-        >
-        <Text
-        style={{
-          color: C.text,
-          fontWeight: "800",
-        }}
-        >
-        Select a location
-        </Text>
+          </View>
         </View>
-      )}
-      </ScrollView>
-      </View>
+      </Modal>
 
-      <View
-      style={{
-        padding: 16,
-        borderTopWidth: 1,
-        borderTopColor: C.border,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-      >
-      <Text
-      style={{
-        flex: 1,
-        color: C.muted,
-        fontSize: 12,
-      }}
-      >
-      {locationReviews.length -
-        confirmedLocationCount}{" "}
-        locations still need review
-        </Text>
+    </View>
+  );
+}
 
-        <Pressable
-        onPress={() =>
-          setPdfReviewOpen(false)
-        }
-        style={{
-          paddingHorizontal: 16,
-          paddingVertical: 11,
-          borderRadius: 11,
-          backgroundColor: C.mint2,
-        }}
-        >
-        <Text
-        style={{
-          color: C.text,
-          fontWeight: "800",
-        }}
-        >
-        Review Later
-        </Text>
-        </Pressable>
-        </View>
-        </View>
-        </View>
-        </Modal>
+/* ============================================================
+ *   I MPORT CHOIC*E
+ *   ============================================================ */
 
-        </View>
-    );
-  }
-
-  /* ============================================================
-   *   I MPORT CHOIC*E
-   *   ============================================================ */
-
-  function ImportChoice({
-    icon,
-    title,
-    subtitle,
-    onPress,
-    disabled = false,
-  }: {
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    subtitle: string;
-    onPress: () => void;
-    disabled?: boolean;
-  }) {
-    return (
-      <Pressable
+function ImportChoice({
+  icon,
+  title,
+  subtitle,
+  onPress,
+  disabled = false,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
       disabled={disabled}
       onPress={disabled ? undefined : onPress}
       style={({
         pressed,
       }) => [
-        styles.importChoice,
-        disabled && styles.importChoiceDisabled,
-        pressed && !disabled && {
-          opacity: 0.75,
-        },
-      ]}
-      >
+          styles.importChoice,
+          disabled && styles.importChoiceDisabled,
+          pressed && !disabled && {
+            opacity: 0.75,
+          },
+        ]}
+    >
       <View style={[
         styles.importChoiceIcon,
         disabled && styles.importChoiceIconDisabled,
       ]}>
-      <Ionicons
-      name={disabled ? "lock-closed-outline" : icon}
-      size={27}
-      color={disabled ? "#AAB8B5" : C.teal}
-      />
+        <Ionicons
+          name={disabled ? "lock-closed-outline" : icon}
+          size={27}
+          color={disabled ? "#AAB8B5" : C.teal}
+        />
       </View>
 
       <Text
-      style={[
-        styles.importChoiceTitle,
-        disabled && styles.importChoiceTitleDisabled,
-      ]}
+        style={[
+          styles.importChoiceTitle,
+          disabled && styles.importChoiceTitleDisabled,
+        ]}
       >
-      {title}
+        {title}
       </Text>
 
       <Text
-      style={[
-        styles.importChoiceSubtitle,
-        disabled && styles.importChoiceSubtitleDisabled,
-      ]}
+        style={[
+          styles.importChoiceSubtitle,
+          disabled && styles.importChoiceSubtitleDisabled,
+        ]}
       >
-      {subtitle}
+        {subtitle}
       </Text>
 
       {disabled ? (
         <Text style={styles.importChoiceLockedText}>
-        Complete metadata first
+          Complete metadata first
         </Text>
       ) : (
         <Text style={styles.browseText}>
-        Browse file →
+          Browse file →
         </Text>
       )}
-      </Pressable>
-    );
-  }
+    </Pressable>
+  );
+}
 
-  /* ============================================================
-   *   Q UALITY SCRE*EN
-   *   ============================================================ */
+/* ============================================================
+ *   Q UALITY SCRE*EN
+ *   ============================================================ */
 
-  function QualityScreen({
-    dataset,
-  }: {
-    dataset?: Dataset;
-  }) {
-    const quality =
+function QualityScreen({
+  dataset,
+}: {
+  dataset?: Dataset;
+}) {
+  const quality =
     dataset?.quality || {};
 
-    const isExport =
+  const isExport =
     dataset?.source_type ===
     "metalsense_export";
 
-        const score = Math.round(
-          quality.score ?? 0,
-        );
+  const score = Math.round(
+    quality.score ?? 0,
+  );
 
-        const qualityLabel =
-        isExport
-        ? "Export Integrity"
-        : "Data Quality";
+  const qualityLabel =
+    isExport
+      ? "Export Integrity"
+      : "Data Quality";
 
-        const qualityEyebrow =
-        isExport
-        ? "EXPORT INTEGRITY"
-        : "VALIDATION GATE";
+  const qualityEyebrow =
+    isExport
+      ? "EXPORT INTEGRITY"
+      : "VALIDATION GATE";
 
-        const qualityDescription =
-        isExport
-        ? "Integrity is calculated from the completeness and validity of the previously exported MetalSense results."
-        : "Quality signals are calculated from the persisted import, not estimated.";
+  const qualityDescription =
+    isExport
+      ? "Integrity is calculated from the completeness and validity of the previously exported MetalSense results."
+      : "Quality signals are calculated from the persisted import, not estimated.";
 
-        const total =
-        quality.valid_records ??
-        dataset?.records?.length ??
-        0;
+  const total =
+    quality.valid_records ??
+    dataset?.records?.length ??
+    0;
 
-        const valid =
-        quality.valid_records ??
-        total;
+  const valid =
+    quality.valid_records ??
+    total;
 
-        const checks = getQualityChecks(
-          dataset,
-        );
+  const checks = getQualityChecks(
+    dataset,
+  );
 
-        const issues = checks.filter(
-          (check) => check.count > 0,
-        ).length;
+  const issues = checks.filter(
+    (check) => check.count > 0,
+  ).length;
 
-        return (
-          <View>
-          <PageIntro
-          eyebrow={qualityEyebrow}
-          title={qualityLabel}
-          description={qualityDescription}
-          />
+  return (
+    <View>
+      <PageIntro
+        eyebrow={qualityEyebrow}
+        title={qualityLabel}
+        description={qualityDescription}
+      />
 
-          <View style={styles.qualityHero}>
-          <Text style={styles.qualityEyebrow}>
+      <View style={styles.qualityHero}>
+        <Text style={styles.qualityEyebrow}>
           {qualityLabel.toUpperCase()} SCORE
-          </Text>
+        </Text>
 
-          <View style={styles.qualityScoreLine}>
+        <View style={styles.qualityScoreLine}>
           <Text style={styles.qualityScore}>
-          {score}
+            {score}
           </Text>
           <Text style={styles.qualityOutOf}>
-          / 100
+            / 100
           </Text>
-          </View>
+        </View>
 
-          <Text style={styles.qualityGrade}>
+        <Text style={styles.qualityGrade}>
           {score >= 90
             ? "Excellent"
             : score >= 75
-            ? "Good"
-            : score >= 50
-            ? "Fair"
-            : "Needs review"}
-            </Text>
-            </View>
+              ? "Good"
+              : score >= 50
+                ? "Fair"
+                : "Needs review"}
+        </Text>
+      </View>
 
-            <View style={styles.statRow}>
-            <StatCard
-            icon="list-outline"
-            value={total}
-            label="Total records"
-            />
-            <StatCard
-            icon="checkmark-circle-outline"
-            value={valid}
-            label="Valid records"
-            />
-            <StatCard
-            icon="alert-circle-outline"
-            value={issues}
-            label="Checks needing review"
-            />
-            </View>
+      <View style={styles.statRow}>
+        <StatCard
+          icon="list-outline"
+          value={total}
+          label="Total records"
+        />
+        <StatCard
+          icon="checkmark-circle-outline"
+          value={valid}
+          label="Valid records"
+        />
+        <StatCard
+          icon="alert-circle-outline"
+          value={issues}
+          label="Checks needing review"
+        />
+      </View>
 
-            <View style={styles.panel}>
-            <Text style={styles.panelTitle}>
-            Checks performed
-            </Text>
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>
+          Checks performed
+        </Text>
 
-            <Text style={styles.panelSubtitle}>
-            Automated validation checks across the imported dataset
-            </Text>
+        <Text style={styles.panelSubtitle}>
+          Automated validation checks across the imported dataset
+        </Text>
 
-            {checks.map((check) => (
-              <View
-              key={check.label}
-              style={styles.checkRow}
-              >
-              <View
+        {checks.map((check) => (
+          <View
+            key={check.label}
+            style={styles.checkRow}
+          >
+            <View
               style={[
                 styles.checkIcon,
                 {
                   backgroundColor:
-                  check.count > 0
-                  ? C.mint2
-                  : C.mint2,
+                    check.count > 0
+                      ? C.mint2
+                      : C.mint2,
                 },
               ]}
-              >
+            >
               <Ionicons
-              name={check.icon}
-              size={17}
-              color={
-                check.count > 0
-                ? C.danger
-                : C.green
-              }
+                name={check.icon}
+                size={17}
+                color={
+                  check.count > 0
+                    ? C.danger
+                    : C.green
+                }
               />
-              </View>
+            </View>
 
-              <View style={{ flex: 1 }}>
+            <View style={{ flex: 1 }}>
               <Text style={styles.checkTitle}>
-              {check.label}
+                {check.label}
               </Text>
               <Text style={styles.checkMeta}>
-              {check.count === 0
-                ? "No issues detected"
-                : `check.countrecord{
+                {check.count === 0
+                  ? "No issues detected"
+                  : `check.countrecord{
                   check.count === 1
                   ? ""
                   : "s"
                 } flagged`}
-                </Text>
-                </View>
+              </Text>
+            </View>
 
-                <View
-                style={[
-                  styles.checkBadge,
-                  {
-                    backgroundColor:
+            <View
+              style={[
+                styles.checkBadge,
+                {
+                  backgroundColor:
                     check.count > 0
-                    ? C.mint2
-                    : C.mint2,
-                  },
-                ]}
-                >
-                <Text
+                      ? C.mint2
+                      : C.mint2,
+                },
+              ]}
+            >
+              <Text
                 style={[
                   styles.checkBadgeText,
                   {
                     color:
-                    check.count > 0
-                    ? C.danger
-                    : C.green,
+                      check.count > 0
+                        ? C.danger
+                        : C.green,
                   },
                 ]}
-                >
+              >
                 {check.count === 0
                   ? "PASS"
                   : "REVIEW"}
-                  </Text>
-                  </View>
-                  </View>
-            ))}
+              </Text>
             </View>
-            </View>
-        );
-  }
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   A NALYSIS    *
-   *   ============================================================ */
+/* ============================================================
+ *   A NALYSIS    *
+ *   ============================================================ */
 
-  // Sample analysis and pollution indices
-  function AnalysisScreen({
-    dataset,
-    token,
-  }: {
-    dataset?: Dataset;
-    token: string;
-  }) {
-    const [summary, setSummary] =
+// Sample analysis and pollution indices
+function AnalysisScreen({
+  dataset,
+  token,
+}: {
+  dataset?: Dataset;
+  token: string;
+}) {
+  const [summary, setSummary] =
     useState<AnalysisSummary | null>(null);
 
-    const [metals, setMetals] =
+  const [metals, setMetals] =
     useState<MetalAnalysis[]>([]);
 
-    const [loading, setLoading] =
+  const [loading, setLoading] =
     useState(false);
 
-    const [error, setError] =
+  const [error, setError] =
     useState("");
 
-    useEffect(() => {
-      let active = true;
+  useEffect(() => {
+    let active = true;
 
-      if (!dataset?.dataset_id || !token) {
-        setSummary(null);
-        setMetals([]);
-        return () => {
-          active = false;
-        };
-      }
+    if (!dataset?.dataset_id || !token) {
+      setSummary(null);
+      setMetals([]);
+      return () => {
+        active = false;
+      };
+    }
 
-      setLoading(true);
-      setError("");
+    setLoading(true);
+    setError("");
 
-      Promise.all([
-        api(
-          `/analysis/${dataset.dataset_id}/summary`,
-          {},
-          token,
-        ),
-        api(
-          `/analysis/${dataset.dataset_id}/metals`,
-          {},
-          token,
-        ),
-      ])
+    Promise.all([
+      api(
+        `/analysis/${dataset.dataset_id}/summary`,
+        {},
+        token,
+      ),
+      api(
+        `/analysis/${dataset.dataset_id}/metals`,
+        {},
+        token,
+      ),
+    ])
       .then(([summaryData, metalData]) => {
         if (!active) return;
 
         setSummary(summaryData);
         setMetals(
           Array.isArray(metalData?.metals)
-          ? metalData.metals
-          : [],
+            ? metalData.metals
+            : [],
         );
       })
       .catch((err: any) => {
@@ -4488,56 +4688,56 @@ process.env.EXPO_BACKEND_URL ||
         }
       });
 
-      return () => {
-        active = false;
-      };
-    }, [dataset?.dataset_id, token]);
+    return () => {
+      active = false;
+    };
+  }, [dataset?.dataset_id, token]);
 
-    const avgHpi =
+  const avgHpi =
     summary?.average_hpi ?? 0;
-    const avgHei =
+  const avgHei =
     summary?.average_hei ?? 0;
-    const avgCd =
+  const avgCd =
     summary?.average_cd ?? 0;
-    const samples =
+  const samples =
     sampleMetrics(dataset);
 
-    const [selectedSampleId, setSelectedSampleId] =
+  const [selectedSampleId, setSelectedSampleId] =
     useState<string>(
       samples[0]?.id || "",
     );
 
-    const [sampleDropdownOpen, setSampleDropdownOpen] =
+  const [sampleDropdownOpen, setSampleDropdownOpen] =
     useState(false);
 
-    useEffect(() => {
-      if (samples.length === 0) {
-        setSelectedSampleId("");
-        return;
-      }
+  useEffect(() => {
+    if (samples.length === 0) {
+      setSelectedSampleId("");
+      return;
+    }
 
-      const stillExists = samples.some(
-        (item) => item.id === selectedSampleId,
-      );
+    const stillExists = samples.some(
+      (item) => item.id === selectedSampleId,
+    );
 
-      if (!stillExists) {
-        setSelectedSampleId(samples[0].id);
-      }
-    }, [dataset?.dataset_id, samples.length]);
+    if (!stillExists) {
+      setSelectedSampleId(samples[0].id);
+    }
+  }, [dataset?.dataset_id, samples.length]);
 
-    const selectedSample =
+  const selectedSample =
     samples.find(
       (item) => item.id === selectedSampleId,
     ) || samples[0];
 
-    const displayHpi =
+  const displayHpi =
     selectedSample?.hpi ?? avgHpi;
-    const displayHei =
+  const displayHei =
     selectedSample?.hei ?? avgHei;
-    const displayCd =
+  const displayCd =
     selectedSample?.cd ?? avgCd;
 
-    const selectedSampleLocation = selectedSample
+  const selectedSampleLocation = selectedSample
     ? rowLabel(
       selectedSample.row,
       [
@@ -4549,696 +4749,696 @@ process.env.EXPO_BACKEND_URL ||
     )
     : "";
 
-    return (
-      <View>
+  return (
+    <View>
       <View style={styles.analysisHeader}>
-      <View style={styles.analysisHeaderText}>
-      <Text style={styles.pageEyebrow}>
-      DETERMINISTIC INDICES
-      </Text>
-
-      <Text style={styles.pageTitle}>
-      Pollution analysis
-      </Text>
-
-      <Text style={styles.pageDescription}>
-      Select a sample to inspect its pollution indices, status, and measured metal values.
-      </Text>
-      </View>
-
-      <View style={styles.sampleSelectorPanel}>
-      <View style={styles.sampleSelectorHeader}>
-      <View style={{ flex: 1 }}>
-      <Text style={styles.sampleSelectorTitle}>
-      Select sample
-      </Text>
-      <Text style={styles.sampleSelectorSubtitle}>
-      Choose a sample for analysis
-      </Text>
-      </View>
-      </View>
-
-      <Pressable
-      onPress={() =>
-        setSampleDropdownOpen(!sampleDropdownOpen)
-      }
-      style={styles.sampleSelectorButton}
-      disabled={samples.length === 0}
-      >
-      <View style={{ flex: 1 }}>
-      <Text
-      style={styles.sampleSelectorValue}
-      numberOfLines={1}
-      >
-      {selectedSample
-        ? selectedSample.id
-        : "No samples available"}
-        </Text>
-
-        {selectedSampleLocation ? (
-          <Text
-          style={styles.sampleSelectorMeta}
-          numberOfLines={1}
-          >
-          {selectedSampleLocation}
+        <View style={styles.analysisHeaderText}>
+          <Text style={styles.pageEyebrow}>
+            DETERMINISTIC INDICES
           </Text>
-        ) : null}
+
+          <Text style={styles.pageTitle}>
+            Pollution analysis
+          </Text>
+
+          <Text style={styles.pageDescription}>
+            Select a sample to inspect its pollution indices, status, and measured metal values.
+          </Text>
         </View>
 
-        <Ionicons
-        name={
-          sampleDropdownOpen
-          ? "chevron-up-outline"
-          : "chevron-down-outline"
-        }
-        size={18}
-        color={C.teal}
-        />
-        </Pressable>
-
-        {sampleDropdownOpen && samples.length > 0 && (
-          <View style={styles.sampleDropdown}>
-          <ScrollView
-          style={styles.sampleDropdownScroll}
-          nestedScrollEnabled
-          >
-          {samples.map((item) => {
-            const active =
-            item.id === selectedSample?.id;
-
-            const location = rowLabel(
-              item.row,
-              [
-                "location",
-                "area",
-                "region",
-                "water_body",
-              ],
-            );
-
-            return (
-              <Pressable
-              key={item.id}
-              onPress={() => {
-                setSelectedSampleId(item.id);
-                setSampleDropdownOpen(false);
-              }}
-              style={[
-                styles.sampleDropdownOption,
-                active &&
-                styles.sampleDropdownOptionActive,
-              ]}
-              >
-              <View
-              style={[
-                styles.statusDot,
-                {
-                  backgroundColor: statusColor(
-                    item.status,
-                  ),
-                },
-              ]}
-              />
-
-              <View style={{ flex: 1 }}>
-              <Text
-              style={styles.sampleDropdownName}
-              >
-              {item.id}
+        <View style={styles.sampleSelectorPanel}>
+          <View style={styles.sampleSelectorHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sampleSelectorTitle}>
+                Select sample
               </Text>
-
-              <Text
-              style={styles.sampleDropdownMeta}
-              numberOfLines={1}
-              >
-              {location || "Location not provided"}
+              <Text style={styles.sampleSelectorSubtitle}>
+                Choose a sample for analysis
               </Text>
-              </View>
-
-              <View style={styles.sampleDropdownMetrics}>
-              <Text style={styles.sampleDropdownMetric}>
-              HPI {item.hpi.toFixed(2)}
-              </Text>
-              <Text style={styles.sampleDropdownMetric}>
-              HEI {item.hei.toFixed(2)}
-              </Text>
-              <Text style={styles.sampleDropdownMetric}>
-              Cd {item.cd.toFixed(2)}
-              </Text>
-              </View>
-
-              {active && (
-                <Ionicons
-                name="checkmark-circle"
-                size={18}
-                color={C.green}
-                />
-              )}
-              </Pressable>
-            );
-          })}
-          </ScrollView>
+            </View>
           </View>
-        )}
-        </View>
-        </View>
 
-        {loading && (
-          <View style={styles.loadingBanner}>
+          <Pressable
+            onPress={() =>
+              setSampleDropdownOpen(!sampleDropdownOpen)
+            }
+            style={styles.sampleSelectorButton}
+            disabled={samples.length === 0}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={styles.sampleSelectorValue}
+                numberOfLines={1}
+              >
+                {selectedSample
+                  ? selectedSample.id
+                  : "No samples available"}
+              </Text>
+
+              {selectedSampleLocation ? (
+                <Text
+                  style={styles.sampleSelectorMeta}
+                  numberOfLines={1}
+                >
+                  {selectedSampleLocation}
+                </Text>
+              ) : null}
+            </View>
+
+            <Ionicons
+              name={
+                sampleDropdownOpen
+                  ? "chevron-up-outline"
+                  : "chevron-down-outline"
+              }
+              size={18}
+              color={C.teal}
+            />
+          </Pressable>
+
+          {sampleDropdownOpen && samples.length > 0 && (
+            <View style={styles.sampleDropdown}>
+              <ScrollView
+                style={styles.sampleDropdownScroll}
+                nestedScrollEnabled
+              >
+                {samples.map((item) => {
+                  const active =
+                    item.id === selectedSample?.id;
+
+                  const location = rowLabel(
+                    item.row,
+                    [
+                      "location",
+                      "area",
+                      "region",
+                      "water_body",
+                    ],
+                  );
+
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        setSelectedSampleId(item.id);
+                        setSampleDropdownOpen(false);
+                      }}
+                      style={[
+                        styles.sampleDropdownOption,
+                        active &&
+                        styles.sampleDropdownOptionActive,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.statusDot,
+                          {
+                            backgroundColor: statusColor(
+                              item.status,
+                            ),
+                          },
+                        ]}
+                      />
+
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={styles.sampleDropdownName}
+                        >
+                          {item.id}
+                        </Text>
+
+                        <Text
+                          style={styles.sampleDropdownMeta}
+                          numberOfLines={1}
+                        >
+                          {location || "Location not provided"}
+                        </Text>
+                      </View>
+
+                      <View style={styles.sampleDropdownMetrics}>
+                        <Text style={styles.sampleDropdownMetric}>
+                          HPI {item.hpi.toFixed(2)}
+                        </Text>
+                        <Text style={styles.sampleDropdownMetric}>
+                          HEI {item.hei.toFixed(2)}
+                        </Text>
+                        <Text style={styles.sampleDropdownMetric}>
+                          Cd {item.cd.toFixed(2)}
+                        </Text>
+                      </View>
+
+                      {active && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={18}
+                          color={C.green}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {loading && (
+        <View style={styles.loadingBanner}>
           <ActivityIndicator color={C.green} />
           <Text style={styles.loadingText}>
-          Loading backend analysis…
+            Loading backend analysis…
           </Text>
-          </View>
-        )}
+        </View>
+      )}
 
-        {!!error && (
-          <View style={styles.loadingBanner}>
+      {!!error && (
+        <View style={styles.loadingBanner}>
           <Ionicons
-          name="alert-circle-outline"
-          size={19}
-          color={C.danger}
+            name="alert-circle-outline"
+            size={19}
+            color={C.danger}
           />
           <Text
-          style={[
-            styles.loadingText,
-            { color: C.danger },
-          ]}
+            style={[
+              styles.loadingText,
+              { color: C.danger },
+            ]}
           >
-          {error}
+            {error}
           </Text>
-          </View>
-        )}
-
-        <View style={styles.gaugeRow}>
-        <PollutionGauge
-        value={displayHpi}
-        label="HPI"
-        max={300}
-        />
-        <PollutionGauge
-        value={displayHei}
-        label="HEI"
-        max={50}
-        />
-        <PollutionGauge
-        value={displayCd}
-        label="CD"
-        max={25}
-        />
         </View>
+      )}
 
-        <View style={styles.panel}>
+      <View style={styles.gaugeRow}>
+        <PollutionGauge
+          value={displayHpi}
+          label="HPI"
+          max={300}
+        />
+        <PollutionGauge
+          value={displayHei}
+          label="HEI"
+          max={50}
+        />
+        <PollutionGauge
+          value={displayCd}
+          label="CD"
+          max={25}
+        />
+      </View>
+
+      <View style={styles.panel}>
         <Text style={styles.panelTitle}>
-        Sample pollution data
+          Sample pollution data
         </Text>
         <Text style={styles.panelSubtitle}>
-        Select a sample above to inspect its pollution indices
+          Select a sample above to inspect its pollution indices
         </Text>
 
         {samples.length === 0 ? (
           <EmptyState
-          icon="analytics-outline"
-          title="No sample analysis available"
-          text="Import a dataset and select it as the active dataset."
+            icon="analytics-outline"
+            title="No sample analysis available"
+            text="Import a dataset and select it as the active dataset."
           />
         ) : (
           samples.map((item) => (
             <Pressable
-            key={item.id}
-            style={({ pressed }) => [
-              styles.sampleRow,
-              pressed && {
-                backgroundColor: C.mint2,
-              },
-            ]}
+              key={item.id}
+              style={({ pressed }) => [
+                styles.sampleRow,
+                pressed && {
+                  backgroundColor: C.mint2,
+                },
+              ]}
             >
-            <View
-            style={[
-              styles.statusDot,
-              {
-                backgroundColor:
-                statusColor(
-                  item.status,
-                ),
-              },
-            ]}
-            />
+              <View
+                style={[
+                  styles.statusDot,
+                  {
+                    backgroundColor:
+                      statusColor(
+                        item.status,
+                      ),
+                  },
+                ]}
+              />
 
-            <View style={{ flex: 1 }}>
-            <Text style={styles.sampleTitle}>
-            {item.id} · {item.status}
-            </Text>
-            <Text style={styles.sampleMeta}>
-            {rowLabel(
-              item.row,
-              [
-                "location",
-                "area",
-                "region",
-                "water_body",
-              ],
-            ) || "Location not provided"}
-            </Text>
-            </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sampleTitle}>
+                  {item.id} · {item.status}
+                </Text>
+                <Text style={styles.sampleMeta}>
+                  {rowLabel(
+                    item.row,
+                    [
+                      "location",
+                      "area",
+                      "region",
+                      "water_body",
+                    ],
+                  ) || "Location not provided"}
+                </Text>
+              </View>
 
-            <View style={styles.sampleRight}>
-            <Text style={styles.sampleHpi}>
-            HPI{" "}
-            {item.hpi.toFixed(2)}
-            </Text>
-            <Text style={styles.sampleHei}>
-            HEI{" "}
-            {item.hei.toFixed(2)}
-            {" · Cd "}
-            {item.cd.toFixed(2)}
-            </Text>
-            </View>
+              <View style={styles.sampleRight}>
+                <Text style={styles.sampleHpi}>
+                  HPI{" "}
+                  {item.hpi.toFixed(2)}
+                </Text>
+                <Text style={styles.sampleHei}>
+                  HEI{" "}
+                  {item.hei.toFixed(2)}
+                  {" · Cd "}
+                  {item.cd.toFixed(2)}
+                </Text>
+              </View>
             </Pressable>
           ))
         )}
-        </View>
+      </View>
 
-        <View style={styles.panel}>
+      <View style={styles.panel}>
         <Text style={styles.panelTitle}>
-        Metal analysis
+          Metal analysis
         </Text>
 
         <Text style={styles.panelSubtitle}>
-        Loaded from /analysis/{'{dataset_id}'}/metals
+          Loaded from /analysis/{'{dataset_id}'}/metals
         </Text>
 
         {metals.length === 0 ? (
           <EmptyState
-          icon="analytics-outline"
-          title="No metal analysis available"
-          text="Import a dataset and select it as the active dataset."
+            icon="analytics-outline"
+            title="No metal analysis available"
+            text="Import a dataset and select it as the active dataset."
           />
         ) : (
           metals.map((metal) => (
             <View
-            key={metal.metal}
-            style={styles.sampleRow}
+              key={metal.metal}
+              style={styles.sampleRow}
             >
-            <View
-            style={[
-              styles.statusDot,
-              {
-                backgroundColor:
-                (metal.maximum_exceedance ??
-                0) > 0
-                ? C.high
-                : C.green,
-              },
-            ]}
-            />
+              <View
+                style={[
+                  styles.statusDot,
+                  {
+                    backgroundColor:
+                      (metal.maximum_exceedance ??
+                        0) > 0
+                        ? C.high
+                        : C.green,
+                  },
+                ]}
+              />
 
-            <View style={{ flex: 1 }}>
-            <Text style={styles.sampleTitle}>
-            {metal.metal}
-            </Text>
-            <Text style={styles.sampleMeta}>
-            {metal.sample_count} samples · max exceedance{" "}
-            {Number(
-              metal.maximum_exceedance ??
-              0,
-            ).toFixed(2)}
-            %
-            </Text>
-            </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sampleTitle}>
+                  {metal.metal}
+                </Text>
+                <Text style={styles.sampleMeta}>
+                  {metal.sample_count} samples · max exceedance{" "}
+                  {Number(
+                    metal.maximum_exceedance ??
+                    0,
+                  ).toFixed(2)}
+                  %
+                </Text>
+              </View>
 
-            <View style={styles.sampleRight}>
-            <Text style={styles.sampleHpi}>
-            Ratio{" "}
-            {Number(
-              metal.average_ratio ??
-              0,
-            ).toFixed(3)}
-            </Text>
-            <Text style={styles.sampleHei}>
-            Avg{" "}
-            {Number(
-              metal.average_measured ??
-              0,
-            ).toFixed(4)}{" "}
-            mg/L
-            </Text>
-            </View>
+              <View style={styles.sampleRight}>
+                <Text style={styles.sampleHpi}>
+                  Ratio{" "}
+                  {Number(
+                    metal.average_ratio ??
+                    0,
+                  ).toFixed(3)}
+                </Text>
+                <Text style={styles.sampleHei}>
+                  Avg{" "}
+                  {Number(
+                    metal.average_measured ??
+                    0,
+                  ).toFixed(4)}{" "}
+                  mg/L
+                </Text>
+              </View>
             </View>
           ))
         )}
-        </View>
-        </View>
-    );
-  }
+      </View>
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   P O L L U T I O N   G A U G E
-   *   ============================================================ */
+/* ============================================================
+ *   P O L L U T I O N   G A U G E
+ *   ============================================================ */
 
-  function polarToCartesian(
-    cx: number,
-    cy: number,
-    radius: number,
-    angleInDegrees: number,
-  ) {
-    const angleInRadians =
+function polarToCartesian(
+  cx: number,
+  cy: number,
+  radius: number,
+  angleInDegrees: number,
+) {
+  const angleInRadians =
     ((angleInDegrees - 90) * Math.PI) / 180;
 
-    return {
-      x: cx + radius * Math.cos(angleInRadians),
-      y: cy + radius * Math.sin(angleInRadians),
-    };
-  }
+  return {
+    x: cx + radius * Math.cos(angleInRadians),
+    y: cy + radius * Math.sin(angleInRadians),
+  };
+}
 
-  function describeGaugeArc(
-    cx: number,
-    cy: number,
-    radius: number,
-    startAngle: number,
-    endAngle: number,
-  ) {
-    const start = polarToCartesian(
-      cx,
-      cy,
-      radius,
-      endAngle,
-    );
-    const end = polarToCartesian(
-      cx,
-      cy,
-      radius,
-      startAngle,
-    );
+function describeGaugeArc(
+  cx: number,
+  cy: number,
+  radius: number,
+  startAngle: number,
+  endAngle: number,
+) {
+  const start = polarToCartesian(
+    cx,
+    cy,
+    radius,
+    endAngle,
+  );
+  const end = polarToCartesian(
+    cx,
+    cy,
+    radius,
+    startAngle,
+  );
 
-    const largeArcFlag =
+  const largeArcFlag =
     endAngle - startAngle <= 180 ? "0" : "1";
 
-    return [
-      "M",
-      start.x,
-      start.y,
-      "A",
-      radius,
-      radius,
-      0,
-      largeArcFlag,
-      0,
-      end.x,
-      end.y,
-    ].join(" ");
-  }
+  return [
+    "M",
+    start.x,
+    start.y,
+    "A",
+    radius,
+    radius,
+    0,
+    largeArcFlag,
+    0,
+    end.x,
+    end.y,
+  ].join(" ");
+}
 
-  // Index gauge used in sample analysis
-  function PollutionGauge({
-    value,
-    label,
-    max,
-  }: {
-    value: number;
-    label: string;
-    max: number;
-  }) {
-    const safeValue = Number.isFinite(value)
+// Index gauge used in sample analysis
+function PollutionGauge({
+  value,
+  label,
+  max,
+}: {
+  value: number;
+  label: string;
+  max: number;
+}) {
+  const safeValue = Number.isFinite(value)
     ? Math.max(0, value)
     : 0;
 
-    const percentage =
+  const percentage =
     max > 0
-    ? Math.min(safeValue / max, 1)
-    : 0;
+      ? Math.min(safeValue / max, 1)
+      : 0;
 
-    // 0 = left side, 100% = right side.
-    const needleAngle =
+  // 0 = left side, 100% = right side.
+  const needleAngle =
     -90 + percentage * 180;
 
-    const needleEnd = polarToCartesian(
-      90,
-      88,
-      58,
-      needleAngle,
-    );
+  const needleEnd = polarToCartesian(
+    90,
+    88,
+    58,
+    needleAngle,
+  );
 
-    const status =
+  const status =
     percentage < 0.33
-    ? "SAFE"
-    : percentage < 0.66
-    ? "MODERATE"
-    : "CRITICAL";
+      ? "SAFE"
+      : percentage < 0.66
+        ? "MODERATE"
+        : "CRITICAL";
 
-    const statusColor =
+  const statusColor =
     percentage < 0.33
-    ? C.green
-    : percentage < 0.66
-    ? C.warning
-    : C.danger;
+      ? C.green
+      : percentage < 0.66
+        ? C.warning
+        : C.danger;
 
-    return (
-      <View style={styles.gaugeCard}>
+  return (
+    <View style={styles.gaugeCard}>
       <Svg
-      width="180"
-      height="132"
-      viewBox="0 0 180 132"
+        width="180"
+        height="132"
+        viewBox="0 0 180 132"
       >
-      {/* Green / safe section */}
-      <Path
-      d={describeGaugeArc(
-        90,
-        88,
-        67,
-        -90,
-        -30,
-      )}
-      fill="none"
-      stroke={C.teal}
-      strokeWidth="13"
-      />
+        {/* Green / safe section */}
+        <Path
+          d={describeGaugeArc(
+            90,
+            88,
+            67,
+            -90,
+            -30,
+          )}
+          fill="none"
+          stroke={C.teal}
+          strokeWidth="13"
+        />
 
-      {/* Yellow / moderate section */}
-      <Path
-      d={describeGaugeArc(
-        90,
-        88,
-        67,
-        -30,
-        30,
-      )}
-      fill="none"
-      stroke={C.warning}
-      strokeWidth="13"
-      />
+        {/* Yellow / moderate section */}
+        <Path
+          d={describeGaugeArc(
+            90,
+            88,
+            67,
+            -30,
+            30,
+          )}
+          fill="none"
+          stroke={C.warning}
+          strokeWidth="13"
+        />
 
-      {/* Orange section */}
-      <Path
-      d={describeGaugeArc(
-        90,
-        88,
-        67,
-        30,
-        60,
-      )}
-      fill="none"
-      stroke={C.high}
-      strokeWidth="13"
-      />
+        {/* Orange section */}
+        <Path
+          d={describeGaugeArc(
+            90,
+            88,
+            67,
+            30,
+            60,
+          )}
+          fill="none"
+          stroke={C.high}
+          strokeWidth="13"
+        />
 
-      {/* Red / critical section */}
-      <Path
-      d={describeGaugeArc(
-        90,
-        88,
-        67,
-        60,
-        90,
-      )}
-      fill="none"
-      stroke={C.danger}
-      strokeWidth="13"
-      />
+        {/* Red / critical section */}
+        <Path
+          d={describeGaugeArc(
+            90,
+            88,
+            67,
+            60,
+            90,
+          )}
+          fill="none"
+          stroke={C.danger}
+          strokeWidth="13"
+        />
 
-      {/* Needle */}
-      <Line
-      x1="90"
-      y1="88"
-      x2={needleEnd.x}
-      y2={needleEnd.y}
-      stroke={C.text}
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      />
+        {/* Needle */}
+        <Line
+          x1="90"
+          y1="88"
+          x2={needleEnd.x}
+          y2={needleEnd.y}
+          stroke={C.text}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
 
-      {/* Needle center */}
-      <Circle
-      cx="90"
-      cy="88"
-      r="4"
-      fill={C.text}
-      />
+        {/* Needle center */}
+        <Circle
+          cx="90"
+          cy="88"
+          r="4"
+          fill={C.text}
+        />
       </Svg>
 
       <View style={styles.gaugeValueContainer}>
-      <Text style={styles.gaugeValue}>
-      {safeValue.toFixed(2)}
-      </Text>
+        <Text style={styles.gaugeValue}>
+          {safeValue.toFixed(2)}
+        </Text>
 
-      <Text
-      style={[
-        styles.gaugeStatus,
-        { color: statusColor },
-      ]}
-      >
-      {status}
-      </Text>
+        <Text
+          style={[
+            styles.gaugeStatus,
+            { color: statusColor },
+          ]}
+        >
+          {status}
+        </Text>
 
-      <Text style={styles.gaugeLabel}>
-      {label}
-      </Text>
+        <Text style={styles.gaugeLabel}>
+          {label}
+        </Text>
       </View>
-      </View>
+    </View>
+  );
+}
+
+async function loadGoogleMaps() {
+  if (Platform.OS !== "web") {
+    throw new Error("Google Maps is configured for the web app.");
+  }
+
+  if (!GOOGLE_MAPS_API_KEY) {
+    throw new Error(
+      "Missing EXPO_PUBLIC_GOOGLE_MAPS_API_KEY in frontend/.env.",
     );
   }
 
-  async function loadGoogleMaps() {
-    if (Platform.OS !== "web") {
-      throw new Error("Google Maps is configured for the web app.");
-    }
-
-    if (!GOOGLE_MAPS_API_KEY) {
-      throw new Error(
-        "Missing EXPO_PUBLIC_GOOGLE_MAPS_API_KEY in frontend/.env.",
-      );
-    }
-
-    const getGoogle = () =>
+  const getGoogle = () =>
     (globalThis as any).google as any;
 
-    const hasMaps = () => {
-      const google = getGoogle();
-      return Boolean(
-        google?.maps?.Map &&
-        google?.maps?.marker?.AdvancedMarkerElement,
-      );
-    };
+  const hasMaps = () => {
+    const google = getGoogle();
+    return Boolean(
+      google?.maps?.Map &&
+      google?.maps?.marker?.AdvancedMarkerElement,
+    );
+  };
 
-    if (hasMaps()) {
-      return getGoogle();
-    }
+  if (hasMaps()) {
+    return getGoogle();
+  }
 
-    const existingScript = document.querySelector(
-      'script[data-metalsense-google-maps="true"]',
-    ) as HTMLScriptElement | null;
+  const existingScript = document.querySelector(
+    'script[data-metalsense-google-maps="true"]',
+  ) as HTMLScriptElement | null;
 
-    if (existingScript && !hasMaps()) {
-      existingScript.remove();
-    }
+  if (existingScript && !hasMaps()) {
+    existingScript.remove();
+  }
 
-    if (!document.querySelector(
-      'script[data-metalsense-google-maps="true"]',
-    )) {
-      await new Promise<void>((resolve, reject) => {
-        const script = document.createElement("script");
+  if (!document.querySelector(
+    'script[data-metalsense-google-maps="true"]',
+  )) {
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script");
 
-        script.dataset.metalsenseGoogleMaps = "true";
+      script.dataset.metalsenseGoogleMaps = "true";
 
-        script.src =
+      script.src =
         `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(
           GOOGLE_MAPS_API_KEY,
         )}&v=weekly&libraries=marker`;
 
-        script.async = true;
-        script.defer = true;
+      script.async = true;
+      script.defer = true;
 
-        script.onload = () => {
-          if (hasMaps()) {
-            resolve();
-          } else {
-            reject(
-              new Error(
-                "Google Maps loaded, but the Maps/Marker libraries are unavailable.",
-              ),
-            );
-          }
-        };
+      script.onload = () => {
+        if (hasMaps()) {
+          resolve();
+        } else {
+          reject(
+            new Error(
+              "Google Maps loaded, but the Maps/Marker libraries are unavailable.",
+            ),
+          );
+        }
+      };
 
-        script.onerror = () =>
+      script.onerror = () =>
         reject(
           new Error(
             "Google Maps JavaScript API failed to load.",
           ),
         );
 
-        document.head.appendChild(script);
-      });
-    } else {
-      await new Promise<void>((resolve, reject) => {
-        const started = Date.now();
+      document.head.appendChild(script);
+    });
+  } else {
+    await new Promise<void>((resolve, reject) => {
+      const started = Date.now();
 
-        const timer = window.setInterval(() => {
-          if (hasMaps()) {
-            window.clearInterval(timer);
-            resolve();
-            return;
-          }
+      const timer = window.setInterval(() => {
+        if (hasMaps()) {
+          window.clearInterval(timer);
+          resolve();
+          return;
+        }
 
-          if (Date.now() - started > 15000) {
-            window.clearInterval(timer);
-            reject(
-              new Error(
-                "Timed out waiting for Google Maps.",
-              ),
-            );
-          }
-        }, 100);
-      });
-    }
-
-    return getGoogle();
+        if (Date.now() - started > 15000) {
+          window.clearInterval(timer);
+          reject(
+            new Error(
+              "Timed out waiting for Google Maps.",
+            ),
+          );
+        }
+      }, 100);
+    });
   }
 
-  /* ============================================================
-   *   S PATIAL     *
-   *   ============================================================ */
+  return getGoogle();
+}
 
-  function SpatialScreen({
-    dataset,
-    token,
-  }: {
-    dataset?: Dataset;
-    token: string;
-  }) {
-    const [mapData, setMapData] =
+/* ============================================================
+ *   S PATIAL     *
+ *   ============================================================ */
+
+function SpatialScreen({
+  dataset,
+  token,
+}: {
+  dataset?: Dataset;
+  token: string;
+}) {
+  const [mapData, setMapData] =
     useState<MapPointsResponse | null>(null);
-    const [mapSummary, setMapSummary] =
+  const [mapSummary, setMapSummary] =
     useState<MapSummary | null>(null);
-    const [hotspotData, setHotspotData] =
+  const [hotspotData, setHotspotData] =
     useState<MapHotspotsResponse | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [mapLoading, setMapLoading] = useState(false);
-    const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [mapLoading, setMapLoading] = useState(false);
+  const [error, setError] = useState("");
 
-    const mapElementRef = React.useRef<any>(null);
-    const mapRef = React.useRef<any>(null);
-    const markersRef = React.useRef<any[]>([]);
-    const circlesRef = React.useRef<any[]>([]);
+  const mapElementRef = React.useRef<any>(null);
+  const mapRef = React.useRef<any>(null);
+  const markersRef = React.useRef<any[]>([]);
+  const circlesRef = React.useRef<any[]>([]);
 
-    useEffect(() => {
-      let active = true;
+  useEffect(() => {
+    let active = true;
 
-      if (!dataset?.dataset_id || !token) {
-        setMapData(null);
-        setMapSummary(null);
-        setHotspotData(null);
-        return () => { active = false; };
-      }
+    if (!dataset?.dataset_id || !token) {
+      setMapData(null);
+      setMapSummary(null);
+      setHotspotData(null);
+      return () => { active = false; };
+    }
 
-      setLoading(true);
-      setError("");
+    setLoading(true);
+    setError("");
 
-      Promise.all([
-        api(`/map/${dataset.dataset_id}/points`, {}, token),
-                  api(`/map/${dataset.dataset_id}/summary`, {}, token),
-                  api(`/map/${dataset.dataset_id}/hotspots?radius_km=5`, {}, token),
-      ])
+    Promise.all([
+      api(`/map/${dataset.dataset_id}/points`, {}, token),
+      api(`/map/${dataset.dataset_id}/summary`, {}, token),
+      api(`/map/${dataset.dataset_id}/hotspots?radius_km=5`, {}, token),
+    ])
       .then(([points, summary, hotspots]) => {
         if (!active) return;
         setMapData(points);
@@ -5255,91 +5455,91 @@ process.env.EXPO_BACKEND_URL ||
         if (active) setLoading(false);
       });
 
-        return () => { active = false; };
-    }, [dataset?.dataset_id, token]);
+    return () => { active = false; };
+  }, [dataset?.dataset_id, token]);
 
-    const points = mapData?.points ?? [];
+  const points = mapData?.points ?? [];
 
-    useEffect(() => {
-      if (Platform.OS !== "web" || !points.length || !mapElementRef.current) {
-        return;
-      }
+  useEffect(() => {
+    if (Platform.OS !== "web" || !points.length || !mapElementRef.current) {
+      return;
+    }
 
-      let cancelled = false;
+    let cancelled = false;
 
-      const renderMap = async () => {
-        try {
-          setMapLoading(true);
+    const renderMap = async () => {
+      try {
+        setMapLoading(true);
 
-          const google = await loadGoogleMaps();
-          if (cancelled) return;
+        const google = await loadGoogleMaps();
+        if (cancelled) return;
 
-          const Map = google.maps.Map;
-          const AdvancedMarkerElement =
+        const Map = google.maps.Map;
+        const AdvancedMarkerElement =
           google.maps.marker.AdvancedMarkerElement;
-          const PinElement =
+        const PinElement =
           google.maps.marker.PinElement;
 
-          if (!Map || !AdvancedMarkerElement || !PinElement) {
-            throw new Error(
-              "Google Maps loaded, but the required Maps/Marker classes are unavailable.",
-            );
-          }
+        if (!Map || !AdvancedMarkerElement || !PinElement) {
+          throw new Error(
+            "Google Maps loaded, but the required Maps/Marker classes are unavailable.",
+          );
+        }
 
-          markersRef.current.forEach((marker) => { marker.map = null; });
-          markersRef.current = [];
-          circlesRef.current.forEach((circle) => circle.setMap(null));
-          circlesRef.current = [];
+        markersRef.current.forEach((marker) => { marker.map = null; });
+        markersRef.current = [];
+        circlesRef.current.forEach((circle) => circle.setMap(null));
+        circlesRef.current = [];
 
-          const first = points[0];
-          const center = {
-            lat: Number(mapSummary?.center?.latitude ?? first.latitude),
-              lng: Number(mapSummary?.center?.longitude ?? first.longitude),
-          };
+        const first = points[0];
+        const center = {
+          lat: Number(mapSummary?.center?.latitude ?? first.latitude),
+          lng: Number(mapSummary?.center?.longitude ?? first.longitude),
+        };
 
-          const map = new Map(mapElementRef.current, {
-            center,
-            zoom: points.length === 1 ? 14 : 7,
-            mapId: "DEMO_MAP_ID",
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: true,
-            zoomControl: true,
-            clickableIcons: false,
+        const map = new Map(mapElementRef.current, {
+          center,
+          zoom: points.length === 1 ? 14 : 7,
+          mapId: "DEMO_MAP_ID",
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: true,
+          zoomControl: true,
+          clickableIcons: false,
+        });
+
+        mapRef.current = map;
+
+        const infoWindow = new google.maps.InfoWindow();
+
+        const bounds = new google.maps.LatLngBounds();
+
+        points.forEach((point) => {
+          const lat = Number(point.latitude);
+          const lng = Number(point.longitude);
+          bounds.extend({ lat, lng });
+
+          const color = statusColor(point.status || "UNKNOWN");
+          const pin = new PinElement({
+            background: color,
+            borderColor: color,
+            glyphColor: "#FFFFFF",
           });
 
-          mapRef.current = map;
+          const marker = new AdvancedMarkerElement({
+            map,
+            position: { lat, lng },
+            title: `${point.sample_id} · ${point.status || "UNKNOWN"}`,
+            content: pin.element,
+            gmpClickable: true,
+          });
 
-          const infoWindow = new google.maps.InfoWindow();
+          marker.addListener("click", () => {
+            const hpi = point.hpi == null ? "N/A" : Number(point.hpi).toFixed(2);
+            const hei = point.hei == null ? "N/A" : Number(point.hei).toFixed(2);
+            const cd = point.cd == null ? "N/A" : Number(point.cd).toFixed(2);
 
-          const bounds = new google.maps.LatLngBounds();
-
-          points.forEach((point) => {
-            const lat = Number(point.latitude);
-            const lng = Number(point.longitude);
-            bounds.extend({ lat, lng });
-
-            const color = statusColor(point.status || "UNKNOWN");
-            const pin = new PinElement({
-              background: color,
-              borderColor: color,
-              glyphColor: "#FFFFFF",
-            });
-
-            const marker = new AdvancedMarkerElement({
-              map,
-              position: { lat, lng },
-              title: `${point.sample_id} · ${point.status || "UNKNOWN"}`,
-              content: pin.element,
-              gmpClickable: true,
-            });
-
-            marker.addListener("click", () => {
-              const hpi = point.hpi == null ? "N/A" : Number(point.hpi).toFixed(2);
-              const hei = point.hei == null ? "N/A" : Number(point.hei).toFixed(2);
-              const cd = point.cd == null ? "N/A" : Number(point.cd).toFixed(2);
-
-              infoWindow.setContent(`
+            infoWindow.setContent(`
               <div style="min-width:230px;font-family:Arial,sans-serif;color:#405168;padding:4px">
               <div style="font-size:16px;font-weight:700;margin-bottom:5px">${point.sample_id}</div>
               <div style="font-size:12px;font-weight:700;color:color;margin-bottom:9px">{point.status || "UNKNOWN"}</div>
@@ -5355,1413 +5555,1413 @@ process.env.EXPO_BACKEND_URL ||
               </div>
               </div>
               `);
-              infoWindow.open({ map, anchor: marker });
-            });
-
-            markersRef.current.push(marker);
+            infoWindow.open({ map, anchor: marker });
           });
 
-          if (points.length > 1) {
-            map.fitBounds(bounds, 60);
-          }
+          markersRef.current.push(marker);
+        });
 
-          (hotspotData?.hotspots ?? []).forEach((hotspot) => {
-            const circle = new google.maps.Circle({
-              map,
-              center: {
-                lat: Number(hotspot.center.latitude),
-                                                  lng: Number(hotspot.center.longitude),
-              },
-              radius: Number(hotspot.radius_km) * 1000,
-                                                  fillColor: C.danger,
-                                                  fillOpacity: 0.10,
-                                                  strokeColor: C.danger,
-                                                  strokeOpacity: 0.45,
-                                                  strokeWeight: 2,
-                                                  clickable: false,
-            });
-            circlesRef.current.push(circle);
-          });
-        } catch (err: any) {
-          console.error("Google Maps failed:", err);
-          if (!cancelled) {
-            setError(err?.message || "Unable to initialize Google Maps.");
-          }
-        } finally {
-          if (!cancelled) setMapLoading(false);
+        if (points.length > 1) {
+          map.fitBounds(bounds, 60);
         }
-      };
 
-      renderMap();
+        (hotspotData?.hotspots ?? []).forEach((hotspot) => {
+          const circle = new google.maps.Circle({
+            map,
+            center: {
+              lat: Number(hotspot.center.latitude),
+              lng: Number(hotspot.center.longitude),
+            },
+            radius: Number(hotspot.radius_km) * 1000,
+            fillColor: C.danger,
+            fillOpacity: 0.10,
+            strokeColor: C.danger,
+            strokeOpacity: 0.45,
+            strokeWeight: 2,
+            clickable: false,
+          });
+          circlesRef.current.push(circle);
+        });
+      } catch (err: any) {
+        console.error("Google Maps failed:", err);
+        if (!cancelled) {
+          setError(err?.message || "Unable to initialize Google Maps.");
+        }
+      } finally {
+        if (!cancelled) setMapLoading(false);
+      }
+    };
 
-      return () => {
-        cancelled = true;
-        markersRef.current.forEach((marker) => { marker.map = null; });
-        markersRef.current = [];
-        circlesRef.current.forEach((circle) => circle.setMap(null));
-        circlesRef.current = [];
-      };
-    }, [points, mapSummary, hotspotData]);
+    renderMap();
 
-    return (
-      <View>
+    return () => {
+      cancelled = true;
+      markersRef.current.forEach((marker) => { marker.map = null; });
+      markersRef.current = [];
+      circlesRef.current.forEach((circle) => circle.setMap(null));
+      circlesRef.current = [];
+    };
+  }, [points, mapSummary, hotspotData]);
+
+  return (
+    <View>
       <PageIntro
-      eyebrow="COORDINATE INTELLIGENCE"
-      title="Spatial & temporal"
-      description="Explore monitoring locations, risk levels, and spatial clusters directly on the Google Maps layer."
+        eyebrow="COORDINATE INTELLIGENCE"
+        title="Spatial & temporal"
+        description="Explore monitoring locations, risk levels, and spatial clusters directly on the Google Maps layer."
       />
 
       {(loading || mapLoading) && (
         <View style={styles.loadingBanner}>
-        <ActivityIndicator color={C.green} />
-        <Text style={styles.loadingText}>
-        {loading ? "Loading map data…" : "Initializing Google Maps…"}
-        </Text>
+          <ActivityIndicator color={C.green} />
+          <Text style={styles.loadingText}>
+            {loading ? "Loading map data…" : "Initializing Google Maps…"}
+          </Text>
         </View>
       )}
 
       {!!error && (
         <View style={styles.loadingBanner}>
-        <Ionicons name="alert-circle-outline" size={19} color={C.danger} />
-        <Text style={[styles.loadingText, { color: C.danger }]}>
-        {error}
-        </Text>
+          <Ionicons name="alert-circle-outline" size={19} color={C.danger} />
+          <Text style={[styles.loadingText, { color: C.danger }]}>
+            {error}
+          </Text>
         </View>
       )}
 
       <View style={styles.panel}>
-      <Text style={styles.panelTitle}>Pollution map</Text>
-      <Text style={styles.panelSubtitle}>
-      {points.length} monitoring points · {mapSummary?.high_risk_count ?? 0} high-risk · {mapSummary?.moderate_count ?? 0} moderate · {mapSummary?.low_risk_count ?? 0} low
-      </Text>
-
-      {Platform.OS !== "web" ? (
-        <View style={styles.mapFallback}>
-        <Ionicons name="map-outline" size={42} color={C.teal} />
-        <Text style={styles.mapFallbackTitle}>Google Maps web layer</Text>
-        <Text style={styles.mapFallbackText}>
-        The interactive Google Maps layer is configured for the web application.
+        <Text style={styles.panelTitle}>Pollution map</Text>
+        <Text style={styles.panelSubtitle}>
+          {points.length} monitoring points · {mapSummary?.high_risk_count ?? 0} high-risk · {mapSummary?.moderate_count ?? 0} moderate · {mapSummary?.low_risk_count ?? 0} low
         </Text>
-        </View>
-      ) : (
-        <View ref={mapElementRef} style={styles.googleMap} />
-      )}
+
+        {Platform.OS !== "web" ? (
+          <View style={styles.mapFallback}>
+            <Ionicons name="map-outline" size={42} color={C.teal} />
+            <Text style={styles.mapFallbackTitle}>Google Maps web layer</Text>
+            <Text style={styles.mapFallbackText}>
+              The interactive Google Maps layer is configured for the web application.
+            </Text>
+          </View>
+        ) : (
+          <View ref={mapElementRef} style={styles.googleMap} />
+        )}
       </View>
 
       <TemporalTrendAnalysis dataset={dataset} />
 
       <View style={styles.panel}>
-      <Text style={styles.panelTitle}>Risk legend</Text>
-      <View style={styles.legendRow}>
-      {[
-        ["LOW", C.green],
-        ["MODERATE", C.warning],
-        ["HIGH", C.high],
-        ["CRITICAL", C.danger],
-      ].map(([label, color]) => (
-        <View key={label} style={styles.legendItem}>
-        <View style={[styles.legendDot, { backgroundColor: color }]} />
-        <Text style={styles.legendText}>{label}</Text>
+        <Text style={styles.panelTitle}>Risk legend</Text>
+        <View style={styles.legendRow}>
+          {[
+            ["LOW", C.green],
+            ["MODERATE", C.warning],
+            ["HIGH", C.high],
+            ["CRITICAL", C.danger],
+          ].map(([label, color]) => (
+            <View key={label} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: color }]} />
+              <Text style={styles.legendText}>{label}</Text>
+            </View>
+          ))}
         </View>
-      ))}
-      </View>
       </View>
 
       <View style={styles.panel}>
-      <Text style={styles.panelTitle}>Monitoring locations</Text>
-      <Text style={styles.panelSubtitle}>Click a marker for the sample details.</Text>
+        <Text style={styles.panelTitle}>Monitoring locations</Text>
+        <Text style={styles.panelSubtitle}>Click a marker for the sample details.</Text>
 
-      {points.length === 0 ? (
-        <EmptyState
-        icon="map-outline"
-        title="No locations detected"
-        text="Import a dataset containing latitude and longitude."
-        />
-      ) : (
-        points.map((point) => (
-          <View
-          style={styles.sampleRow}
-          key={`point.sampleid-{point.latitude}-${point.longitude}`}
-          >
-          <View
-          style={[
-            styles.statusDot,
-            { backgroundColor: statusColor(point.status || "UNKNOWN") },
-          ]}
+        {points.length === 0 ? (
+          <EmptyState
+            icon="map-outline"
+            title="No locations detected"
+            text="Import a dataset containing latitude and longitude."
           />
+        ) : (
+          points.map((point) => (
+            <View
+              style={styles.sampleRow}
+              key={`point.sampleid-{point.latitude}-${point.longitude}`}
+            >
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: statusColor(point.status || "UNKNOWN") },
+                ]}
+              />
 
-          <View style={{ flex: 1 }}>
-          <Text style={styles.sampleTitle}>
-          {point.sample_id} · {point.status || "UNKNOWN"}
-          </Text>
-          <Text style={styles.sampleMeta}>
-          {Number(point.latitude).toFixed(5)}, {Number(point.longitude).toFixed(5)} · {point.country || "Unknown country"} · {point.area || point.region || "Unknown area"}
-          </Text>
-          </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sampleTitle}>
+                  {point.sample_id} · {point.status || "UNKNOWN"}
+                </Text>
+                <Text style={styles.sampleMeta}>
+                  {Number(point.latitude).toFixed(5)}, {Number(point.longitude).toFixed(5)} · {point.country || "Unknown country"} · {point.area || point.region || "Unknown area"}
+                </Text>
+              </View>
 
-          <View style={styles.sampleRight}>
-          <Text style={styles.sampleHpi}>
-          HPI {Number(point.hpi ?? 0).toFixed(2)}
-          </Text>
-          <Text style={styles.sampleHei}>
-          {point.highest_metal || "No highest metal"}
-          </Text>
-          </View>
-          </View>
-        ))
-      )}
+              <View style={styles.sampleRight}>
+                <Text style={styles.sampleHpi}>
+                  HPI {Number(point.hpi ?? 0).toFixed(2)}
+                </Text>
+                <Text style={styles.sampleHei}>
+                  {point.highest_metal || "No highest metal"}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
       </View>
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
-  // Reports
+// Reports
 
-  function ReportsScreen({
-    dataset,
-    datasets,
-    user,
-  }: {
-    dataset?: Dataset;
-    datasets: Dataset[];
-    user: User;
-  }) {
-    const [selectedDatasetId, setSelectedDatasetId] =
+function ReportsScreen({
+  dataset,
+  datasets,
+  user,
+}: {
+  dataset?: Dataset;
+  datasets: Dataset[];
+  user: User;
+}) {
+  const [selectedDatasetId, setSelectedDatasetId] =
     useState<string>(dataset?.dataset_id || "");
 
-    useEffect(() => {
-      if (
-        dataset?.dataset_id &&
-        !datasets.some(
-          (item) =>
+  useEffect(() => {
+    if (
+      dataset?.dataset_id &&
+      !datasets.some(
+        (item) =>
           item.dataset_id === selectedDatasetId,
-        )
-      ) {
-        setSelectedDatasetId(dataset.dataset_id);
-      }
-    }, [
-      dataset?.dataset_id,
-      datasets,
-      selectedDatasetId,
-    ]);
+      )
+    ) {
+      setSelectedDatasetId(dataset.dataset_id);
+    }
+  }, [
+    dataset?.dataset_id,
+    datasets,
+    selectedDatasetId,
+  ]);
 
-    // Pick the dataset used for this report
-    const selectedDataset =
+  // Pick the dataset used for this report
+  const selectedDataset =
     datasets.find(
       (item) =>
-      item.dataset_id === selectedDatasetId,
+        item.dataset_id === selectedDatasetId,
     ) || dataset;
 
-    const metrics = sampleMetrics(selectedDataset);
+  const metrics = sampleMetrics(selectedDataset);
 
-    const lowCount = metrics.filter(
-      (item) => item.status === "LOW",
-    ).length;
+  const lowCount = metrics.filter(
+    (item) => item.status === "LOW",
+  ).length;
 
-    const moderateCount = metrics.filter(
-      (item) => item.status === "MODERATE",
-    ).length;
+  const moderateCount = metrics.filter(
+    (item) => item.status === "MODERATE",
+  ).length;
 
-    const highCount = metrics.filter(
-      (item) =>
+  const highCount = metrics.filter(
+    (item) =>
       item.status === "HIGH" ||
       item.status === "CRITICAL",
-    ).length;
+  ).length;
 
-    const safeCount = metrics.filter(
-      (item) => item.status === "SAFE",
-    ).length;
+  const safeCount = metrics.filter(
+    (item) => item.status === "SAFE",
+  ).length;
 
-    const averageHpi = metrics.length
+  const averageHpi = metrics.length
     ? metrics.reduce(
       (sum, item) => sum + item.hpi,
-                     0,
+      0,
     ) / metrics.length
     : 0;
 
-    const averageHei = metrics.length
+  const averageHei = metrics.length
     ? metrics.reduce(
       (sum, item) => sum + item.hei,
-                     0,
+      0,
     ) / metrics.length
     : 0;
 
-    const highestHpi = metrics.length
+  const highestHpi = metrics.length
     ? Math.max(
       ...metrics.map((item) => item.hpi),
     )
     : 0;
 
-    const highestHpiSample = metrics.length
+  const highestHpiSample = metrics.length
     ? metrics.reduce(
       (best, item) =>
-      item.hpi > best.hpi ? item : best,
+        item.hpi > best.hpi ? item : best,
       metrics[0],
     )
     : null;
 
-    const standard =
+  const standard =
     selectedDataset?.records?.[0]?.standard ||
     selectedDataset?.records?.[0]?.analysis?.standard ||
     "Not available";
 
-        const metalStats = (() => {
-          const totals: Record<
-          string,
-          {
-            total: number;
-            count: number;
-          }
-          > = {};
+  const metalStats = (() => {
+    const totals: Record<
+      string,
+      {
+        total: number;
+        count: number;
+      }
+    > = {};
 
-          (selectedDataset?.records || []).forEach(
-            (row) => {
-              const analysisMetals = Array.isArray(
-                row?.analysis?.metals,
-              )
-              ? row.analysis.metals
-              : [];
+    (selectedDataset?.records || []).forEach(
+      (row) => {
+        const analysisMetals = Array.isArray(
+          row?.analysis?.metals,
+        )
+          ? row.analysis.metals
+          : [];
 
-              /*
-               * Prefer the backend's normalized analysis.metals
-               * collection when available. Raw uploaded metal
-               * columns are only used as a fallback. This is why
-               * the old report could incorrectly show
-               * "Not available" even though the analysis API
-               * had Pb/Cd/etc. measurements.
-               */
-              if (analysisMetals.length > 0) {
-                analysisMetals.forEach((entry: any) => {
-                  const metal = String(
-                    entry?.metal ||
-                    entry?.name ||
-                    entry?.symbol ||
-                    "",
-                  ).trim();
+        /*
+         * Prefer the backend's normalized analysis.metals
+         * collection when available. Raw uploaded metal
+         * columns are only used as a fallback. This is why
+         * the old report could incorrectly show
+         * "Not available" even though the analysis API
+         * had Pb/Cd/etc. measurements.
+         */
+        if (analysisMetals.length > 0) {
+          analysisMetals.forEach((entry: any) => {
+            const metal = String(
+              entry?.metal ||
+              entry?.name ||
+              entry?.symbol ||
+              "",
+            ).trim();
 
-                  const value = Number(
-                    entry?.measured ??
-                    entry?.numeric_value ??
-                    entry?.value ??
-                    entry?.calculation_value,
-                  );
+            const value = Number(
+              entry?.measured ??
+              entry?.numeric_value ??
+              entry?.value ??
+              entry?.calculation_value,
+            );
 
-                  if (!metal || !Number.isFinite(value)) {
-                    return;
-                  }
+            if (!metal || !Number.isFinite(value)) {
+              return;
+            }
 
-                  if (!totals[metal]) {
-                    totals[metal] = {
-                      total: 0,
-                      count: 0,
-                    };
-                  }
+            if (!totals[metal]) {
+              totals[metal] = {
+                total: 0,
+                count: 0,
+              };
+            }
 
-                  totals[metal].total += value;
-                  totals[metal].count += 1;
-                });
-              } else {
-                metalKeysFor(row).forEach((key) => {
-                  const value = Number(row[key]);
+            totals[metal].total += value;
+            totals[metal].count += 1;
+          });
+        } else {
+          metalKeysFor(row).forEach((key) => {
+            const value = Number(row[key]);
 
-                  if (!Number.isFinite(value)) {
-                    return;
-                  }
+            if (!Number.isFinite(value)) {
+              return;
+            }
 
-                  if (!totals[key]) {
-                    totals[key] = {
-                      total: 0,
-                      count: 0,
-                    };
-                  }
+            if (!totals[key]) {
+              totals[key] = {
+                total: 0,
+                count: 0,
+              };
+            }
 
-                  totals[key].total += value;
-                  totals[key].count += 1;
-                });
-              }
-            },
-          );
+            totals[key].total += value;
+            totals[key].count += 1;
+          });
+        }
+      },
+    );
 
-          return Object.entries(totals)
-          .map(([metal, value]) => ({
-            metal,
-            average:
-            value.count > 0
+    return Object.entries(totals)
+      .map(([metal, value]) => ({
+        metal,
+        average:
+          value.count > 0
             ? value.total / value.count
             : 0,
-          }))
-          .sort(
-            (a, b) => b.average - a.average,
-          );
-        })();
+      }))
+      .sort(
+        (a, b) => b.average - a.average,
+      );
+  })();
 
-        const leadingMetal =
-        metalStats[0]?.metal || "Not available";
+  const leadingMetal =
+    metalStats[0]?.metal || "Not available";
 
-        const maxMetalValue =
-        metalStats.length > 0
-        ? Math.max(
-          ...metalStats.map(
-            (item) => item.average,
-          ),
-          1,
-        )
-        : 1;
+  const maxMetalValue =
+    metalStats.length > 0
+      ? Math.max(
+        ...metalStats.map(
+          (item) => item.average,
+        ),
+        1,
+      )
+      : 1;
 
-        const qualityChecks = getQualityChecks(
-          selectedDataset,
-        );
+  const qualityChecks = getQualityChecks(
+    selectedDataset,
+  );
 
-        const activeQualityChecks =
-        qualityChecks.filter(
-          (check) => check.count > 0,
-        ).length;
+  const activeQualityChecks =
+    qualityChecks.filter(
+      (check) => check.count > 0,
+    ).length;
 
-        const decisionItems = [
-          {
-            icon:
-            "warning-outline" as keyof typeof Ionicons.glyphMap,
-            title:
-            highCount > 0
-            ? `Prioritize ${highCount} high-risk site(s)`
-            : "No high-risk sites detected",
-            text:
-            highCount > 0
-            ? "High-risk samples exceed the configured analysis thresholds. Recommend immediate re-sampling and source investigation."
-            : "No high-risk samples are currently flagged by the analysis.",
-            color:
-            highCount > 0
-            ? C.danger
-            : C.green,
-          },
-          {
-            icon:
-            "flask-outline" as keyof typeof Ionicons.glyphMap,
-            title:
-            leadingMetal === "Not available"
-            ? "No leading contaminant available"
-            : `${leadingMetal} is the leading contaminant dataset-wide`,
-            text:
-            leadingMetal === "Not available"
-            ? "No supported metal measurements are available for this dataset."
-            : `${leadingMetal} has the highest aggregate measured concentration across the available sample rows. Consider targeted source tracing.`,
-            color: C.warning,
-          },
-          {
-            icon:
-            "shield-checkmark-outline" as keyof typeof Ionicons.glyphMap,
-            title:
-            activeQualityChecks > 0
-            ? `Improve data quality at ${activeQualityChecks} check(s)`
-            : "Data quality checks passed",
-            text:
-            activeQualityChecks > 0
-            ? "Review flagged validation checks before relying on computed indices for decisions."
-            : "No active data-quality issues are currently reported for this dataset.",
-            color: C.teal,
-          },
-        ];
+  const decisionItems = [
+    {
+      icon:
+        "warning-outline" as keyof typeof Ionicons.glyphMap,
+      title:
+        highCount > 0
+          ? `Prioritize ${highCount} high-risk site(s)`
+          : "No high-risk sites detected",
+      text:
+        highCount > 0
+          ? "High-risk samples exceed the configured analysis thresholds. Recommend immediate re-sampling and source investigation."
+          : "No high-risk samples are currently flagged by the analysis.",
+      color:
+        highCount > 0
+          ? C.danger
+          : C.green,
+    },
+    {
+      icon:
+        "flask-outline" as keyof typeof Ionicons.glyphMap,
+      title:
+        leadingMetal === "Not available"
+          ? "No leading contaminant available"
+          : `${leadingMetal} is the leading contaminant dataset-wide`,
+      text:
+        leadingMetal === "Not available"
+          ? "No supported metal measurements are available for this dataset."
+          : `${leadingMetal} has the highest aggregate measured concentration across the available sample rows. Consider targeted source tracing.`,
+      color: C.warning,
+    },
+    {
+      icon:
+        "shield-checkmark-outline" as keyof typeof Ionicons.glyphMap,
+      title:
+        activeQualityChecks > 0
+          ? `Improve data quality at ${activeQualityChecks} check(s)`
+          : "Data quality checks passed",
+      text:
+        activeQualityChecks > 0
+          ? "Review flagged validation checks before relying on computed indices for decisions."
+          : "No active data-quality issues are currently reported for this dataset.",
+      color: C.teal,
+    },
+  ];
 
-        const exportCsv = () => {
-          if (!selectedDataset) {
-            Alert.alert(
-              "Nothing to export",
-              "Import a dataset first.",
-            );
-            return;
-          }
+  const exportCsv = () => {
+    if (!selectedDataset) {
+      Alert.alert(
+        "Nothing to export",
+        "Import a dataset first.",
+      );
+      return;
+    }
 
-          const columns =
-          selectedDataset.columns ||
-          Object.keys(
-            selectedDataset.records?.[0] || {},
-          );
+    const columns =
+      selectedDataset.columns ||
+      Object.keys(
+        selectedDataset.records?.[0] || {},
+      );
 
-          const reportColumns = [
-            ...columns,
-            "analysis_status",
-            "analysis_hpi",
-            "analysis_hei",
-            "analysis_cd",
-          ];
+    const reportColumns = [
+      ...columns,
+      "analysis_status",
+      "analysis_hpi",
+      "analysis_hei",
+      "analysis_cd",
+    ];
 
-          const lines: any[][] = [
-            [
-              "MetalSense report",
-              "",
-              "",
-            ],
-            [
-              "Dataset",
-              selectedDataset.filename,
-              "",
-            ],
-            [
-              "User",
-              user.full_name,
-              "",
-            ],
-            [
-              "Role",
-              user.role,
-              "",
-            ],
-            [
-              "Organization",
-              user.organization || "",
-              "",
-            ],
-            [
-              "Data Source",
-              selectedDataset.data_source || "",
-              "",
-            ],
-            [
-              "Laboratory / Organization",
-              selectedDataset.laboratory_organization || "",
-              "",
-            ],
-            [
-              "Report ID",
-              selectedDataset.report_id || "",
-              "",
-            ],
-            [
-              "Analytical Method",
-              selectedDataset.analytical_method || "",
-              "",
-            ],
-            [
-              "Detection Limit",
-              selectedDataset.detection_limit || "",
-              "",
-            ],
-            [],
-            reportColumns,
-          ];
+    const lines: any[][] = [
+      [
+        "MetalSense report",
+        "",
+        "",
+      ],
+      [
+        "Dataset",
+        selectedDataset.filename,
+        "",
+      ],
+      [
+        "User",
+        user.full_name,
+        "",
+      ],
+      [
+        "Role",
+        user.role,
+        "",
+      ],
+      [
+        "Organization",
+        user.organization || "",
+        "",
+      ],
+      [
+        "Data Source",
+        selectedDataset.data_source || "",
+        "",
+      ],
+      [
+        "Laboratory / Organization",
+        selectedDataset.laboratory_organization || "",
+        "",
+      ],
+      [
+        "Report ID",
+        selectedDataset.report_id || "",
+        "",
+      ],
+      [
+        "Analytical Method",
+        selectedDataset.analytical_method || "",
+        "",
+      ],
+      [
+        "Detection Limit",
+        selectedDataset.detection_limit || "",
+        "",
+      ],
+      [],
+      reportColumns,
+    ];
 
-          (selectedDataset.records || []).forEach(
-            (row) => {
-              const analysis = row.analysis || {};
+    (selectedDataset.records || []).forEach(
+      (row) => {
+        const analysis = row.analysis || {};
 
-              lines.push(
-                reportColumns.map(
-                  (column) => {
-                    if (
-                      column ===
-                      "analysis_status"
-                    ) {
-                      return (
-                        analysis.status || ""
-                      );
-                    }
+        lines.push(
+          reportColumns.map(
+            (column) => {
+              if (
+                column ===
+                "analysis_status"
+              ) {
+                return (
+                  analysis.status || ""
+                );
+              }
 
-                    if (
-                      column ===
-                      "analysis_hpi"
-                    ) {
-                      return (
-                        analysis.hpi ?? ""
-                      );
-                    }
+              if (
+                column ===
+                "analysis_hpi"
+              ) {
+                return (
+                  analysis.hpi ?? ""
+                );
+              }
 
-                    if (
-                      column ===
-                      "analysis_hei"
-                    ) {
-                      return (
-                        analysis.hei ?? ""
-                      );
-                    }
+              if (
+                column ===
+                "analysis_hei"
+              ) {
+                return (
+                  analysis.hei ?? ""
+                );
+              }
 
-                    if (
-                      column ===
-                      "analysis_cd"
-                    ) {
-                      return (
-                        analysis.cd ?? ""
-                      );
-                    }
+              if (
+                column ===
+                "analysis_cd"
+              ) {
+                return (
+                  analysis.cd ?? ""
+                );
+              }
 
-                    return String(
-                      row[column] ?? "",
-                    );
-                  },
-                ),
+              return String(
+                row[column] ?? "",
               );
             },
-          );
+          ),
+        );
+      },
+    );
 
-          const csv = lines
-          .map(
-            (line: any[]) =>
-            line
+    const csv = lines
+      .map(
+        (line: any[]) =>
+          line
             .map(
               (value) =>
-              `"${String(
-                value ?? "",
-              ).replace(
-                /"/g,
-                '""',
-              )}"`,
+                `"${String(
+                  value ?? "",
+                ).replace(
+                  /"/g,
+                  '""',
+                )}"`,
             )
             .join(","),
-          )
-          .join("\n");
+      )
+      .join("\n");
 
-          if (Platform.OS === "web") {
-            const blob = new Blob(
-              [csv],
-              {
-                type:
-                "text/csv;charset=utf-8",
-              },
-            );
+    if (Platform.OS === "web") {
+      const blob = new Blob(
+        [csv],
+        {
+          type:
+            "text/csv;charset=utf-8",
+        },
+      );
 
-            const url =
-            URL.createObjectURL(blob);
+      const url =
+        URL.createObjectURL(blob);
 
-            const anchor =
-            document.createElement("a");
+      const anchor =
+        document.createElement("a");
 
-            anchor.href = url;
+      anchor.href = url;
 
-            anchor.download =
-            `${selectedDataset.filename.replace(
-              /\.[^.]+$/,
-              "",
-            )}_metalsense_report.csv`;
+      anchor.download =
+        `${selectedDataset.filename.replace(
+          /\.[^.]+$/,
+          "",
+        )}_metalsense_report.csv`;
 
-            anchor.click();
+      anchor.click();
 
-            URL.revokeObjectURL(url);
-          } else {
-            Alert.alert(
-              "CSV ready",
-              "CSV export is available in the web preview.",
-            );
-          }
-        };
+      URL.revokeObjectURL(url);
+    } else {
+      Alert.alert(
+        "CSV ready",
+        "CSV export is available in the web preview.",
+      );
+    }
+  };
 
-        const exportPdfSummary = async () => {
-          if (
-            Platform.OS !== "web" ||
-            typeof window === "undefined" ||
-            typeof document === "undefined"
-          ) {
-            Alert.alert(
-              "PDF summary",
-              "PDF export is available from the web preview.",
-            );
-            return;
-          }
+  const exportPdfSummary = async () => {
+    if (
+      Platform.OS !== "web" ||
+      typeof window === "undefined" ||
+      typeof document === "undefined"
+    ) {
+      Alert.alert(
+        "PDF summary",
+        "PDF export is available from the web preview.",
+      );
+      return;
+    }
 
-          if (!selectedDataset) {
-            Alert.alert(
-              "Nothing to export",
-              "Select or import a dataset first.",
-            );
-            return;
-          }
+    if (!selectedDataset) {
+      Alert.alert(
+        "Nothing to export",
+        "Select or import a dataset first.",
+      );
+      return;
+    }
 
-          const escapeHtml = (value: any) =>
-          String(value ?? "")
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#39;");
+    const escapeHtml = (value: any) =>
+      String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 
-          const riskColor = (status: string) => {
-            const normalized = String(status || "").toUpperCase();
+    const riskColor = (status: string) => {
+      const normalized = String(status || "").toUpperCase();
 
-            if (
-              normalized === "HIGH" ||
-              normalized === "CRITICAL"
-            ) {
-              return "#C94D4D";
-            }
+      if (
+        normalized === "HIGH" ||
+        normalized === "CRITICAL"
+      ) {
+        return "#C94D4D";
+      }
 
-            if (normalized === "MODERATE") {
-              return "#D6A329";
-            }
+      if (normalized === "MODERATE") {
+        return "#D6A329";
+      }
 
-            return "#249E73";
-          };
+      return "#249E73";
+    };
 
-          const canvasToDataUrl = (
-            draw: (
-              ctx: CanvasRenderingContext2D,
-              width: number,
-              height: number,
-            ) => void,
-            width: number,
-            height: number,
-          ) => {
-            const canvas = document.createElement("canvas");
-            const scale = Math.max(
-              2,
-              Math.min(3, window.devicePixelRatio || 1),
-            );
+    const canvasToDataUrl = (
+      draw: (
+        ctx: CanvasRenderingContext2D,
+        width: number,
+        height: number,
+      ) => void,
+      width: number,
+      height: number,
+    ) => {
+      const canvas = document.createElement("canvas");
+      const scale = Math.max(
+        2,
+        Math.min(3, window.devicePixelRatio || 1),
+      );
 
-            canvas.width = width * scale;
-            canvas.height = height * scale;
+      canvas.width = width * scale;
+      canvas.height = height * scale;
 
-            const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d");
 
-            if (!ctx) {
-              return "";
-            }
+      if (!ctx) {
+        return "";
+      }
 
-            ctx.scale(scale, scale);
-            ctx.fillStyle = "#FFFFFF";
-            ctx.fillRect(0, 0, width, height);
-            draw(ctx, width, height);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, width, height);
+      draw(ctx, width, height);
 
-            return canvas.toDataURL("image/png");
-          };
+      return canvas.toDataURL("image/png");
+    };
 
-          const drawGauge = (
-            ctx: CanvasRenderingContext2D,
-            cx: number,
-            cy: number,
-            radius: number,
-            value: number,
-            max: number,
-            label: string,
-          ) => {
-            const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
-            const percentage = max > 0
-            ? Math.min(safeValue / max, 1)
-            : 0;
+    const drawGauge = (
+      ctx: CanvasRenderingContext2D,
+      cx: number,
+      cy: number,
+      radius: number,
+      value: number,
+      max: number,
+      label: string,
+    ) => {
+      const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+      const percentage = max > 0
+        ? Math.min(safeValue / max, 1)
+        : 0;
 
-            ctx.lineWidth = 18;
-            ctx.lineCap = "round";
+      ctx.lineWidth = 18;
+      ctx.lineCap = "round";
 
-            ctx.strokeStyle = "#DDF7F1";
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
-            ctx.stroke();
+      ctx.strokeStyle = "#DDF7F1";
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
+      ctx.stroke();
 
-            const segments = [
-              {
-                from: 0,
-                to: 0.33,
-                color: "#249E73",
-              },
-              {
-                from: 0.33,
-                to: 0.66,
-                color: "#D6A329",
-              },
-              {
-                from: 0.66,
-                to: 0.85,
-                color: "#DE7A32",
-              },
-              {
-                from: 0.85,
-                to: 1,
-                color: "#C94D4D",
-              },
-            ];
+      const segments = [
+        {
+          from: 0,
+          to: 0.33,
+          color: "#249E73",
+        },
+        {
+          from: 0.33,
+          to: 0.66,
+          color: "#D6A329",
+        },
+        {
+          from: 0.66,
+          to: 0.85,
+          color: "#DE7A32",
+        },
+        {
+          from: 0.85,
+          to: 1,
+          color: "#C94D4D",
+        },
+      ];
 
-            segments.forEach((segment) => {
-              const from = Math.min(percentage, segment.from);
-              const to = Math.min(percentage, segment.to);
+      segments.forEach((segment) => {
+        const from = Math.min(percentage, segment.from);
+        const to = Math.min(percentage, segment.to);
 
-              if (to <= from) {
-                return;
-              }
+        if (to <= from) {
+          return;
+        }
 
-              ctx.strokeStyle = segment.color;
-              ctx.beginPath();
-              ctx.arc(
-                cx,
-                cy,
-                radius,
-                Math.PI + Math.PI * from,
-                Math.PI + Math.PI * to,
-              );
-              ctx.stroke();
-            });
+        ctx.strokeStyle = segment.color;
+        ctx.beginPath();
+        ctx.arc(
+          cx,
+          cy,
+          radius,
+          Math.PI + Math.PI * from,
+          Math.PI + Math.PI * to,
+        );
+        ctx.stroke();
+      });
 
-            ctx.fillStyle = "#405168";
-            ctx.textAlign = "center";
-            ctx.font = "800 25px Arial";
-            ctx.fillText(
-              safeValue.toFixed(2),
-                         cx,
-                         cy + 6,
-            );
+      ctx.fillStyle = "#405168";
+      ctx.textAlign = "center";
+      ctx.font = "800 25px Arial";
+      ctx.fillText(
+        safeValue.toFixed(2),
+        cx,
+        cy + 6,
+      );
 
-            ctx.font = "800 13px Arial";
-            ctx.fillStyle = "#0C92A3";
-            ctx.fillText(label, cx, cy + 30);
+      ctx.font = "800 13px Arial";
+      ctx.fillStyle = "#0C92A3";
+      ctx.fillText(label, cx, cy + 30);
 
-            ctx.font = "11px Arial";
-            ctx.fillStyle = "#8A9999";
-            ctx.fillText(`of ${max}`, cx, cy + 47);
-          };
+      ctx.font = "11px Arial";
+      ctx.fillStyle = "#8A9999";
+      ctx.fillText(`of ${max}`, cx, cy + 47);
+    };
 
-          const drawRiskDistribution = canvasToDataUrl(
-            (ctx, width, height) => {
-              const items = [
-                ["LOW", lowCount, "#249E73"],
-                ["MODERATE", moderateCount, "#D6A329"],
-                ["HIGH / CRITICAL", highCount, "#C94D4D"],
-                ["SAFE", safeCount, "#188E68"],
-              ];
+    const drawRiskDistribution = canvasToDataUrl(
+      (ctx, width, height) => {
+        const items = [
+          ["LOW", lowCount, "#249E73"],
+          ["MODERATE", moderateCount, "#D6A329"],
+          ["HIGH / CRITICAL", highCount, "#C94D4D"],
+          ["SAFE", safeCount, "#188E68"],
+        ];
 
-              const total = Math.max(
-                lowCount +
-                moderateCount +
-                highCount +
-                safeCount,
-                1,
-              );
+        const total = Math.max(
+          lowCount +
+          moderateCount +
+          highCount +
+          safeCount,
+          1,
+        );
 
-              ctx.font = "700 16px Arial";
-              ctx.textBaseline = "middle";
+        ctx.font = "700 16px Arial";
+        ctx.textBaseline = "middle";
 
-              items.forEach((item, index) => {
-                const y = 38 + index * 54;
-                const count = Number(item[1]);
-                const share = count / total;
-                const color = String(item[2]);
+        items.forEach((item, index) => {
+          const y = 38 + index * 54;
+          const count = Number(item[1]);
+          const share = count / total;
+          const color = String(item[2]);
 
-                ctx.fillStyle = "#405168";
-                ctx.textAlign = "left";
-                ctx.fillText(String(item[0]), 20, y);
+          ctx.fillStyle = "#405168";
+          ctx.textAlign = "left";
+          ctx.fillText(String(item[0]), 20, y);
 
-                ctx.fillStyle = "#E8F3EF";
-                ctx.beginPath();
-                ctx.roundRect(180, y - 10, width - 310, 20, 10);
-                ctx.fill();
+          ctx.fillStyle = "#E8F3EF";
+          ctx.beginPath();
+          ctx.roundRect(180, y - 10, width - 310, 20, 10);
+          ctx.fill();
 
-                ctx.fillStyle = color;
-                ctx.beginPath();
-                ctx.roundRect(
-                  180,
-                  y - 10,
-                  Math.max(
-                    count > 0 ? 8 : 0,
-                    (width - 310) * share,
-                  ),
-                  20,
-                  10,
-                );
-                ctx.fill();
-
-                ctx.fillStyle = "#405168";
-                ctx.textAlign = "right";
-                ctx.fillText(
-                  `${count} · ${Math.round(share * 100)}%`,
-                             width - 20,
-                             y,
-                );
-              });
-            },
-            900,
-            250,
-          );
-
-          const averageCd = metrics.length
-          ? metrics.reduce(
-            (sum, item) => sum + item.cd,
-                           0,
-          ) / metrics.length
-          : 0;
-
-          const drawPollutionMeters = canvasToDataUrl(
-            (ctx, width, height) => {
-              drawGauge(
-                ctx,
-                150,
-                118,
-                82,
-                averageHpi,
-                300,
-                "HPI",
-              );
-
-              drawGauge(
-                ctx,
-                450,
-                118,
-                82,
-                averageHei,
-                50,
-                "HEI",
-              );
-
-              drawGauge(
-                ctx,
-                750,
-                118,
-                82,
-                averageCd,
-                25,
-                "CD",
-              );
-            },
-            900,
-            210,
-          );
-
-          const maxMetal = Math.max(
-            maxMetalValue,
-            0.000001,
-          );
-
-          const metalGraph = canvasToDataUrl(
-            (ctx, width, height) => {
-              const left = 130;
-              const right = width - 90;
-              const top = 30;
-              const rowHeight = 52;
-
-              ctx.font = "700 18px Arial";
-              ctx.textBaseline = "middle";
-
-              metalStats.forEach((item, index) => {
-                const y = top + index * rowHeight;
-                const trackWidth = right - left;
-                const barWidth = Math.max(
-                  10,
-                  (item.average / maxMetal) * trackWidth,
-                );
-
-                ctx.fillStyle = "#405168";
-                ctx.textAlign = "left";
-                ctx.fillText(item.metal, 12, y + 11);
-
-                ctx.fillStyle = "#E9F2EF";
-                ctx.beginPath();
-                ctx.roundRect(
-                  left,
-                  y,
-                  trackWidth,
-                  22,
-                  11,
-                );
-                ctx.fill();
-
-                ctx.fillStyle = "#0C92A3";
-                ctx.beginPath();
-                ctx.roundRect(
-                  left,
-                  y,
-                  barWidth,
-                  22,
-                  11,
-                );
-                ctx.fill();
-
-                ctx.fillStyle = "#405168";
-                ctx.textAlign = "right";
-                ctx.fillText(
-                  item.average.toFixed(4),
-                             width - 12,
-                             y + 11,
-                );
-
-                ctx.textAlign = "left";
-              });
-            },
-            1000,
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.roundRect(
+            180,
+            y - 10,
             Math.max(
-              130,
-              metalStats.length * 52 + 40,
+              count > 0 ? 8 : 0,
+              (width - 310) * share,
             ),
+            20,
+            10,
+          );
+          ctx.fill();
+
+          ctx.fillStyle = "#405168";
+          ctx.textAlign = "right";
+          ctx.fillText(
+            `${count} · ${Math.round(share * 100)}%`,
+            width - 20,
+            y,
+          );
+        });
+      },
+      900,
+      250,
+    );
+
+    const averageCd = metrics.length
+      ? metrics.reduce(
+        (sum, item) => sum + item.cd,
+        0,
+      ) / metrics.length
+      : 0;
+
+    const drawPollutionMeters = canvasToDataUrl(
+      (ctx, width, height) => {
+        drawGauge(
+          ctx,
+          150,
+          118,
+          82,
+          averageHpi,
+          300,
+          "HPI",
+        );
+
+        drawGauge(
+          ctx,
+          450,
+          118,
+          82,
+          averageHei,
+          50,
+          "HEI",
+        );
+
+        drawGauge(
+          ctx,
+          750,
+          118,
+          82,
+          averageCd,
+          25,
+          "CD",
+        );
+      },
+      900,
+      210,
+    );
+
+    const maxMetal = Math.max(
+      maxMetalValue,
+      0.000001,
+    );
+
+    const metalGraph = canvasToDataUrl(
+      (ctx, width, height) => {
+        const left = 130;
+        const right = width - 90;
+        const top = 30;
+        const rowHeight = 52;
+
+        ctx.font = "700 18px Arial";
+        ctx.textBaseline = "middle";
+
+        metalStats.forEach((item, index) => {
+          const y = top + index * rowHeight;
+          const trackWidth = right - left;
+          const barWidth = Math.max(
+            10,
+            (item.average / maxMetal) * trackWidth,
           );
 
-          const mapRecords = metrics.filter(
-            (item) =>
-            Number.isFinite(item.lat) &&
-            Number.isFinite(item.lon),
+          ctx.fillStyle = "#405168";
+          ctx.textAlign = "left";
+          ctx.fillText(item.metal, 12, y + 11);
+
+          ctx.fillStyle = "#E9F2EF";
+          ctx.beginPath();
+          ctx.roundRect(
+            left,
+            y,
+            trackWidth,
+            22,
+            11,
+          );
+          ctx.fill();
+
+          ctx.fillStyle = "#0C92A3";
+          ctx.beginPath();
+          ctx.roundRect(
+            left,
+            y,
+            barWidth,
+            22,
+            11,
+          );
+          ctx.fill();
+
+          ctx.fillStyle = "#405168";
+          ctx.textAlign = "right";
+          ctx.fillText(
+            item.average.toFixed(4),
+            width - 12,
+            y + 11,
           );
 
-          const drawPollutionMap = canvasToDataUrl(
-            (ctx, width, height) => {
-              if (!mapRecords.length) {
-                ctx.fillStyle = "#6D7C80";
-                ctx.font = "14px Arial";
-                ctx.textAlign = "center";
-                ctx.fillText(
-                  "No valid coordinates available for the pollution map.",
-                  width / 2,
-                  height / 2,
-                );
-                return;
-              }
+          ctx.textAlign = "left";
+        });
+      },
+      1000,
+      Math.max(
+        130,
+        metalStats.length * 52 + 40,
+      ),
+    );
 
-              const lats = mapRecords.map((item) => item.lat);
-              const lons = mapRecords.map((item) => item.lon);
-              const minLat = Math.min(...lats);
-              const maxLat = Math.max(...lats);
-              const minLon = Math.min(...lons);
-              const maxLon = Math.max(...lons);
+    const mapRecords = metrics.filter(
+      (item) =>
+        Number.isFinite(item.lat) &&
+        Number.isFinite(item.lon),
+    );
 
-              const latRange = Math.max(
-                maxLat - minLat,
-                0.00001,
-              );
-
-              const lonRange = Math.max(
-                maxLon - minLon,
-                0.00001,
-              );
-
-              const pad = 60;
-              const plotWidth = width - pad * 2;
-              const plotHeight = height - pad * 2;
-
-              ctx.strokeStyle = "#D4ECE5";
-              ctx.lineWidth = 1;
-
-              for (let i = 0; i <= 5; i += 1) {
-                const x = pad + (plotWidth * i) / 5;
-                const y = pad + (plotHeight * i) / 5;
-
-                ctx.beginPath();
-                ctx.moveTo(x, pad);
-                ctx.lineTo(x, height - pad);
-                ctx.stroke();
-
-                ctx.beginPath();
-                ctx.moveTo(pad, y);
-                ctx.lineTo(width - pad, y);
-                ctx.stroke();
-              }
-
-              mapRecords.forEach((item) => {
-                const x =
-                pad +
-                ((item.lon - minLon) / lonRange) *
-                plotWidth;
-
-                const y =
-                height -
-                pad -
-                ((item.lat - minLat) / latRange) *
-                plotHeight;
-
-                ctx.fillStyle = riskColor(item.status);
-                ctx.beginPath();
-                ctx.arc(x, y, 7, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.strokeStyle = "#FFFFFF";
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                ctx.fillStyle = "#405168";
-                ctx.font = "9px Arial";
-                ctx.textAlign = "left";
-                ctx.fillText(
-                  item.id,
-                  x + 9,
-                  y + 3,
-                );
-              });
-
-              ctx.fillStyle = "#405168";
-              ctx.font = "700 12px Arial";
-              ctx.textAlign = "left";
-              ctx.fillText(
-                `Latitude minLat.toFixed(3)–{maxLat.toFixed(3)}`,
-                           pad,
-                           22,
-              );
-
-              ctx.textAlign = "right";
-              ctx.fillText(
-                `Longitude minLon.toFixed(3)–{maxLon.toFixed(3)}`,
-                           width - pad,
-                           22,
-              );
-
-              ctx.textAlign = "left";
-              ctx.font = "10px Arial";
-
-              [
-                ["LOW / SAFE", "#249E73"],
-                ["MODERATE", "#D6A329"],
-                ["HIGH / CRITICAL", "#C94D4D"],
-              ].forEach((item, index) => {
-                const x = pad + index * 190;
-
-                ctx.fillStyle = String(item[1]);
-                ctx.beginPath();
-                ctx.arc(
-                  x,
-                  height - 22,
-                  5,
-                  0,
-                  Math.PI * 2,
-                );
-                ctx.fill();
-
-                ctx.fillStyle = "#405168";
-                ctx.fillText(
-                  String(item[0]),
-                             x + 9,
-                             height - 19,
-                );
-              });
-            },
-            1000,
-            430,
+    const drawPollutionMap = canvasToDataUrl(
+      (ctx, width, height) => {
+        if (!mapRecords.length) {
+          ctx.fillStyle = "#6D7C80";
+          ctx.font = "14px Arial";
+          ctx.textAlign = "center";
+          ctx.fillText(
+            "No valid coordinates available for the pollution map.",
+            width / 2,
+            height / 2,
           );
+          return;
+        }
 
-          const trendRecords = selectedDataset.records || [];
-          const trendGroups = new Map<
-          string,
-          {
-            timestamp: number;
-            values: Record<string, number[]>;
-          }
-          >();
+        const lats = mapRecords.map((item) => item.lat);
+        const lons = mapRecords.map((item) => item.lon);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLon = Math.min(...lons);
+        const maxLon = Math.max(...lons);
 
-          trendRecords.forEach((row) => {
-            const rawDate = sampleDateFor(row);
+        const latRange = Math.max(
+          maxLat - minLat,
+          0.00001,
+        );
 
-            if (!rawDate) {
-              return;
-            }
+        const lonRange = Math.max(
+          maxLon - minLon,
+          0.00001,
+        );
 
-            const parsed = new Date(
-              String(rawDate).replace(" ", "T"),
-            );
+        const pad = 60;
+        const plotWidth = width - pad * 2;
+        const plotHeight = height - pad * 2;
 
-            if (Number.isNaN(parsed.getTime())) {
-              return;
-            }
+        ctx.strokeStyle = "#D4ECE5";
+        ctx.lineWidth = 1;
 
-            const key =
-            `parsed.getFullYear()-{String(
+        for (let i = 0; i <= 5; i += 1) {
+          const x = pad + (plotWidth * i) / 5;
+          const y = pad + (plotHeight * i) / 5;
+
+          ctx.beginPath();
+          ctx.moveTo(x, pad);
+          ctx.lineTo(x, height - pad);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(pad, y);
+          ctx.lineTo(width - pad, y);
+          ctx.stroke();
+        }
+
+        mapRecords.forEach((item) => {
+          const x =
+            pad +
+            ((item.lon - minLon) / lonRange) *
+            plotWidth;
+
+          const y =
+            height -
+            pad -
+            ((item.lat - minLat) / latRange) *
+            plotHeight;
+
+          ctx.fillStyle = riskColor(item.status);
+          ctx.beginPath();
+          ctx.arc(x, y, 7, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.fillStyle = "#405168";
+          ctx.font = "9px Arial";
+          ctx.textAlign = "left";
+          ctx.fillText(
+            item.id,
+            x + 9,
+            y + 3,
+          );
+        });
+
+        ctx.fillStyle = "#405168";
+        ctx.font = "700 12px Arial";
+        ctx.textAlign = "left";
+        ctx.fillText(
+          `Latitude minLat.toFixed(3)–{maxLat.toFixed(3)}`,
+          pad,
+          22,
+        );
+
+        ctx.textAlign = "right";
+        ctx.fillText(
+          `Longitude minLon.toFixed(3)–{maxLon.toFixed(3)}`,
+          width - pad,
+          22,
+        );
+
+        ctx.textAlign = "left";
+        ctx.font = "10px Arial";
+
+        [
+          ["LOW / SAFE", "#249E73"],
+          ["MODERATE", "#D6A329"],
+          ["HIGH / CRITICAL", "#C94D4D"],
+        ].forEach((item, index) => {
+          const x = pad + index * 190;
+
+          ctx.fillStyle = String(item[1]);
+          ctx.beginPath();
+          ctx.arc(
+            x,
+            height - 22,
+            5,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+
+          ctx.fillStyle = "#405168";
+          ctx.fillText(
+            String(item[0]),
+            x + 9,
+            height - 19,
+          );
+        });
+      },
+      1000,
+      430,
+    );
+
+    const trendRecords = selectedDataset.records || [];
+    const trendGroups = new Map<
+      string,
+      {
+        timestamp: number;
+        values: Record<string, number[]>;
+      }
+    >();
+
+    trendRecords.forEach((row) => {
+      const rawDate = sampleDateFor(row);
+
+      if (!rawDate) {
+        return;
+      }
+
+      const parsed = new Date(
+        String(rawDate).replace(" ", "T"),
+      );
+
+      if (Number.isNaN(parsed.getTime())) {
+        return;
+      }
+
+      const key =
+        `parsed.getFullYear()-{String(
               parsed.getMonth() + 1,
             ).padStart(2, "0")}`;
 
-            if (!trendGroups.has(key)) {
-              trendGroups.set(key, {
-                timestamp: parsed.getTime(),
-                              values: {},
-              });
-            }
+      if (!trendGroups.has(key)) {
+        trendGroups.set(key, {
+          timestamp: parsed.getTime(),
+          values: {},
+        });
+      }
 
-            const group = trendGroups.get(key)!;
+      const group = trendGroups.get(key)!;
 
-            group.timestamp = Math.min(
-              group.timestamp,
-              parsed.getTime(),
-            );
+      group.timestamp = Math.min(
+        group.timestamp,
+        parsed.getTime(),
+      );
 
-            SUPPORTED_METALS.forEach((metal) => {
-              const raw = findField(row, [metal]);
-              const value = Number(raw);
+      SUPPORTED_METALS.forEach((metal) => {
+        const raw = findField(row, [metal]);
+        const value = Number(raw);
 
-              if (!Number.isFinite(value)) {
-                return;
-              }
+        if (!Number.isFinite(value)) {
+          return;
+        }
 
-              if (!group.values[metal]) {
-                group.values[metal] = [];
-              }
+        if (!group.values[metal]) {
+          group.values[metal] = [];
+        }
 
-              group.values[metal].push(value);
-            });
-          });
+        group.values[metal].push(value);
+      });
+    });
 
-          const reportTrendData = Array.from(
-            trendGroups.entries(),
-          )
-          .map(([label, group]) => ({
-            label,
-            timestamp: group.timestamp,
-            values: Object.fromEntries(
-              Object.entries(group.values).map(
-                ([metal, values]) => [
-                  metal,
-                  values.reduce(
-                    (sum, value) => sum + value,
-                                0,
-                  ) / values.length,
-                ],
-              ),
-            ) as Record<string, number>,
-          }))
-          .sort(
-            (a, b) => a.timestamp - b.timestamp,
-          );
+    const reportTrendData = Array.from(
+      trendGroups.entries(),
+    )
+      .map(([label, group]) => ({
+        label,
+        timestamp: group.timestamp,
+        values: Object.fromEntries(
+          Object.entries(group.values).map(
+            ([metal, values]) => [
+              metal,
+              values.reduce(
+                (sum, value) => sum + value,
+                0,
+              ) / values.length,
+            ],
+          ),
+        ) as Record<string, number>,
+      }))
+      .sort(
+        (a, b) => a.timestamp - b.timestamp,
+      );
 
-          const trendMetals = SUPPORTED_METALS.filter(
-            (metal) =>
-            reportTrendData.some(
-              (point) =>
-              Number.isFinite(point.values[metal]),
-            ),
-          );
+    const trendMetals = SUPPORTED_METALS.filter(
+      (metal) =>
+        reportTrendData.some(
+          (point) =>
+            Number.isFinite(point.values[metal]),
+        ),
+    );
 
-          const trendValues = reportTrendData.flatMap(
-            (point) =>
-            trendMetals
-            .map((metal) => point.values[metal])
-            .filter((value) =>
+    const trendValues = reportTrendData.flatMap(
+      (point) =>
+        trendMetals
+          .map((metal) => point.values[metal])
+          .filter((value) =>
             Number.isFinite(value),
+          ),
+    );
+
+    const trendAverage = trendValues.length
+      ? trendValues.reduce(
+        (sum, value) => sum + value,
+        0,
+      ) / trendValues.length
+      : 0;
+
+    const trendPeak = trendValues.length
+      ? Math.max(...trendValues)
+      : 0;
+
+    const trendMidpoint = Math.max(
+      1,
+      Math.floor(reportTrendData.length / 2),
+    );
+
+    const previousTrendValues =
+      reportTrendData
+        .slice(0, trendMidpoint)
+        .flatMap((point) =>
+          trendMetals
+            .map(
+              (metal) =>
+                point.values[metal],
+            )
+            .filter((value) =>
+              Number.isFinite(value),
             ),
-          );
+        );
 
-          const trendAverage = trendValues.length
-          ? trendValues.reduce(
-            (sum, value) => sum + value,
-                               0,
-          ) / trendValues.length
-          : 0;
-
-          const trendPeak = trendValues.length
-          ? Math.max(...trendValues)
-          : 0;
-
-          const trendMidpoint = Math.max(
-            1,
-            Math.floor(reportTrendData.length / 2),
-          );
-
-          const previousTrendValues =
-          reportTrendData
-          .slice(0, trendMidpoint)
-          .flatMap((point) =>
+    const currentTrendValues =
+      reportTrendData
+        .slice(trendMidpoint)
+        .flatMap((point) =>
           trendMetals
-          .map(
-            (metal) =>
-            point.values[metal],
-          )
-          .filter((value) =>
-          Number.isFinite(value),
-          ),
-          );
+            .map(
+              (metal) =>
+                point.values[metal],
+            )
+            .filter((value) =>
+              Number.isFinite(value),
+            ),
+        );
 
-          const currentTrendValues =
-          reportTrendData
-          .slice(trendMidpoint)
-          .flatMap((point) =>
-          trendMetals
-          .map(
-            (metal) =>
-            point.values[metal],
-          )
-          .filter((value) =>
-          Number.isFinite(value),
-          ),
-          );
+    const previousTrendAverage =
+      previousTrendValues.length
+        ? previousTrendValues.reduce(
+          (sum, value) => sum + value,
+          0,
+        ) / previousTrendValues.length
+        : 0;
 
-          const previousTrendAverage =
-          previousTrendValues.length
-          ? previousTrendValues.reduce(
-            (sum, value) => sum + value,
-                                       0,
-          ) / previousTrendValues.length
-          : 0;
+    const currentTrendAverage =
+      currentTrendValues.length
+        ? currentTrendValues.reduce(
+          (sum, value) => sum + value,
+          0,
+        ) / currentTrendValues.length
+        : trendAverage;
 
-          const currentTrendAverage =
-          currentTrendValues.length
-          ? currentTrendValues.reduce(
-            (sum, value) => sum + value,
-                                      0,
-          ) / currentTrendValues.length
-          : trendAverage;
-
-          const trendChangeRate =
-          previousTrendAverage
-          ? ((currentTrendAverage -
+    const trendChangeRate =
+      previousTrendAverage
+        ? ((currentTrendAverage -
           previousTrendAverage) /
           previousTrendAverage) *
-          100
-          : 0;
+        100
+        : 0;
 
-          const trendDirection =
-          trendChangeRate > 5
-          ? "Increasing"
-          : trendChangeRate < -5
+    const trendDirection =
+      trendChangeRate > 5
+        ? "Increasing"
+        : trendChangeRate < -5
           ? "Decreasing"
           : "Stable";
 
-          const trendPalette: Record<
-          string,
-          string
-          > = {
-            Pb: "#5B5BD6",
-            Cd: "#D65B8A",
-            As: "#E49A3A",
-            Cr: "#1A9B7B",
-            Cu: "#2E86DE",
-            Zn: "#8E5BD6",
-            Ni: "#D65B5B",
-            Fe: "#9B6B43",
-            Mn: "#4E8E5D",
-            Hg: "#8A6FB8",
-          };
+    const trendPalette: Record<
+      string,
+      string
+    > = {
+      Pb: "#5B5BD6",
+      Cd: "#D65B8A",
+      As: "#E49A3A",
+      Cr: "#1A9B7B",
+      Cu: "#2E86DE",
+      Zn: "#8E5BD6",
+      Ni: "#D65B5B",
+      Fe: "#9B6B43",
+      Mn: "#4E8E5D",
+      Hg: "#8A6FB8",
+    };
 
-          const drawTemporalTrend = canvasToDataUrl(
-            (ctx, width, height) => {
-              if (
-                reportTrendData.length < 2 ||
-                trendMetals.length === 0
-              ) {
-                ctx.fillStyle = "#6D7C80";
-                ctx.font = "14px Arial";
-                ctx.textAlign = "center";
-                ctx.fillText(
-                  "Temporal data not available.",
-                  width / 2,
-                  height / 2,
-                );
-                return;
-              }
+    const drawTemporalTrend = canvasToDataUrl(
+      (ctx, width, height) => {
+        if (
+          reportTrendData.length < 2 ||
+          trendMetals.length === 0
+        ) {
+          ctx.fillStyle = "#6D7C80";
+          ctx.font = "14px Arial";
+          ctx.textAlign = "center";
+          ctx.fillText(
+            "Temporal data not available.",
+            width / 2,
+            height / 2,
+          );
+          return;
+        }
 
-              const padding = {
-                left: 65,
-                right: 30,
-                top: 35,
-                bottom: 55,
-              };
+        const padding = {
+          left: 65,
+          right: 30,
+          top: 35,
+          bottom: 55,
+        };
 
-              const chartWidth =
-              width -
-              padding.left -
-              padding.right;
+        const chartWidth =
+          width -
+          padding.left -
+          padding.right;
 
-              const chartHeight =
-              height -
-              padding.top -
-              padding.bottom;
+        const chartHeight =
+          height -
+          padding.top -
+          padding.bottom;
 
-              const maxValue = Math.max(
-                trendPeak,
-                1,
-              );
+        const maxValue = Math.max(
+          trendPeak,
+          1,
+        );
 
-              const minValue = trendValues.length
-              ? Math.min(...trendValues)
-              : 0;
+        const minValue = trendValues.length
+          ? Math.min(...trendValues)
+          : 0;
 
-              const range = Math.max(
-                maxValue - minValue,
-                maxValue * 0.08,
-                1,
-              );
+        const range = Math.max(
+          maxValue - minValue,
+          maxValue * 0.08,
+          1,
+        );
 
-              const yMin = Math.max(
-                0,
-                minValue - range * 0.08,
-              );
+        const yMin = Math.max(
+          0,
+          minValue - range * 0.08,
+        );
 
-              const yMax =
-              maxValue + range * 0.08;
+        const yMax =
+          maxValue + range * 0.08;
 
-              ctx.strokeStyle = "#D4ECE5";
-              ctx.lineWidth = 1;
+        ctx.strokeStyle = "#D4ECE5";
+        ctx.lineWidth = 1;
 
-              for (let i = 0; i <= 4; i += 1) {
-                const y =
-                padding.top +
-                (chartHeight * i) / 4;
+        for (let i = 0; i <= 4; i += 1) {
+          const y =
+            padding.top +
+            (chartHeight * i) / 4;
 
-                ctx.beginPath();
-                ctx.moveTo(
-                  padding.left,
-                  y,
-                );
-                ctx.lineTo(
-                  width - padding.right,
-                  y,
-                );
-                ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(
+            padding.left,
+            y,
+          );
+          ctx.lineTo(
+            width - padding.right,
+            y,
+          );
+          ctx.stroke();
 
+          const value =
+            yMax -
+            ((y - padding.top) /
+              chartHeight) *
+            (yMax - yMin);
+
+          ctx.fillStyle = "#9AA8AA";
+          ctx.font = "9px Arial";
+          ctx.textAlign = "right";
+          ctx.fillText(
+            value.toFixed(3),
+            padding.left - 8,
+            y + 3,
+          );
+        }
+
+        trendMetals.forEach((metal) => {
+          const points =
+            reportTrendData
+              .map((point, index) => {
                 const value =
-                yMax -
-                ((y - padding.top) /
-                chartHeight) *
-                (yMax - yMin);
-
-                ctx.fillStyle = "#9AA8AA";
-                ctx.font = "9px Arial";
-                ctx.textAlign = "right";
-                ctx.fillText(
-                  value.toFixed(3),
-                             padding.left - 8,
-                             y + 3,
-                );
-              }
-
-              trendMetals.forEach((metal) => {
-                const points =
-                reportTrendData
-                .map((point, index) => {
-                  const value =
                   point.values[metal];
 
-                  if (
-                    !Number.isFinite(value)
-                  ) {
-                    return null;
-                  }
+                if (
+                  !Number.isFinite(value)
+                ) {
+                  return null;
+                }
 
-                  return {
-                    x:
+                return {
+                  x:
                     padding.left +
                     (reportTrendData.length <= 1
-                    ? chartWidth / 2
-                    : (index /
-                    (reportTrendData.length -
-                    1)) *
-                    chartWidth),
-                    y:
+                      ? chartWidth / 2
+                      : (index /
+                        (reportTrendData.length -
+                          1)) *
+                      chartWidth),
+                  y:
                     padding.top +
                     chartHeight -
                     ((value - yMin) /
-                    Math.max(
-                      yMax - yMin,
-                      1,
-                    )) *
+                      Math.max(
+                        yMax - yMin,
+                        1,
+                      )) *
                     chartHeight,
-                  };
-                })
-                .filter(Boolean) as {
-                  x: number;
-                  y: number;
-                }[];
+                };
+              })
+              .filter(Boolean) as {
+                x: number;
+                y: number;
+              }[];
 
-                if (!points.length) {
-                  return;
-                }
+          if (!points.length) {
+            return;
+          }
 
-                ctx.strokeStyle =
-                trendPalette[metal] ||
-                "#0C92A3";
+          ctx.strokeStyle =
+            trendPalette[metal] ||
+            "#0C92A3";
 
-            ctx.lineWidth = 2.5;
-            ctx.beginPath();
-            ctx.moveTo(
-              points[0].x,
-              points[0].y,
-            );
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(
+            points[0].x,
+            points[0].y,
+          );
 
-            points.slice(1).forEach(
-              (point) => {
-                ctx.lineTo(
-                  point.x,
-                  point.y,
-                );
-              },
-            );
+          points.slice(1).forEach(
+            (point) => {
+              ctx.lineTo(
+                point.x,
+                point.y,
+              );
+            },
+          );
 
-            ctx.stroke();
+          ctx.stroke();
 
-            points.forEach((point) => {
-              ctx.fillStyle =
+          points.forEach((point) => {
+            ctx.fillStyle =
               trendPalette[metal] ||
               "#0C92A3";
 
@@ -6774,108 +6974,108 @@ process.env.EXPO_BACKEND_URL ||
               Math.PI * 2,
             );
             ctx.fill();
-            });
-              });
+          });
+        });
 
-              ctx.fillStyle = "#405168";
-              ctx.font = "9px Arial";
-              ctx.textAlign = "center";
+        ctx.fillStyle = "#405168";
+        ctx.font = "9px Arial";
+        ctx.textAlign = "center";
 
-              reportTrendData.forEach(
-                (point, index) => {
-                  if (
-                    index === 0 ||
-                    index ===
-                    reportTrendData.length - 1 ||
-                    reportTrendData.length <= 8
-                  ) {
-                    const x =
-                    padding.left +
-                    (reportTrendData.length <= 1
-                    ? chartWidth / 2
-                    : (index /
+        reportTrendData.forEach(
+          (point, index) => {
+            if (
+              index === 0 ||
+              index ===
+              reportTrendData.length - 1 ||
+              reportTrendData.length <= 8
+            ) {
+              const x =
+                padding.left +
+                (reportTrendData.length <= 1
+                  ? chartWidth / 2
+                  : (index /
                     (reportTrendData.length -
-                    1)) *
-                    chartWidth);
+                      1)) *
+                  chartWidth);
 
-                    ctx.fillText(
-                      point.label,
-                      x,
-                      height - 24,
-                    );
-                  }
-                },
-              );
-
-              ctx.textAlign = "left";
-
-              trendMetals.forEach(
-                (metal, index) => {
-                  const x =
-                  padding.left +
-                  index * 72;
-
-                  ctx.fillStyle =
-                  trendPalette[metal] ||
-                  "#0C92A3";
-
-              ctx.beginPath();
-              ctx.arc(
-                x,
-                height - 10,
-                4,
-                0,
-                Math.PI * 2,
-              );
-              ctx.fill();
-
-              ctx.fillStyle = "#405168";
               ctx.fillText(
-                metal,
-                x + 8,
-                height - 7,
+                point.label,
+                x,
+                height - 24,
               );
-                },
-              );
-            },
-            1000,
-            430,
-          );
+            }
+          },
+        );
 
-          const latestEvidenceHtml =
-          metrics
-          .slice(0, 10)
-          .map(
-            (item) => `
+        ctx.textAlign = "left";
+
+        trendMetals.forEach(
+          (metal, index) => {
+            const x =
+              padding.left +
+              index * 72;
+
+            ctx.fillStyle =
+              trendPalette[metal] ||
+              "#0C92A3";
+
+            ctx.beginPath();
+            ctx.arc(
+              x,
+              height - 10,
+              4,
+              0,
+              Math.PI * 2,
+            );
+            ctx.fill();
+
+            ctx.fillStyle = "#405168";
+            ctx.fillText(
+              metal,
+              x + 8,
+              height - 7,
+            );
+          },
+        );
+      },
+      1000,
+      430,
+    );
+
+    const latestEvidenceHtml =
+      metrics
+        .slice(0, 10)
+        .map(
+          (item) => `
             <div class="evidence-row">
             <div>
             <strong>${escapeHtml(item.id)} · ${escapeHtml(item.status)}</strong>
             <span>${escapeHtml(
-              item.row?.country ||
-              item.row?.area ||
-              item.row?.region ||
-              "Location not provided",
-            )}</span>
+            item.row?.country ||
+            item.row?.area ||
+            item.row?.region ||
+            "Location not provided",
+          )}</span>
             </div>
             <div class="evidence-index">
             HPI ${item.hpi.toFixed(2)} · HEI ${item.hei.toFixed(2)} · Cd ${item.cd.toFixed(2)}
             </div>
             </div>
             `,
-          )
-          .join("");
+        )
+        .join("");
 
-          const tableHtml =
-          metrics
-          .map(
-            (item) => `
+    const tableHtml =
+      metrics
+        .map(
+          (item) => `
             <tr>
             <td>${escapeHtml(item.id)}</td>
             <td>${escapeHtml(
-              sampleDateFor(item.row) ??
-              item.row?.date ??
-              "",
-            )}</td>
+            sampleDateFor(item.row) ??
+            item.row?.date ??
+            "",
+          )}</td>
             <td>${item.lat.toFixed(4)}</td>
             <td>${item.lon.toFixed(4)}</td>
             <td>${item.hpi.toFixed(2)}</td>
@@ -6886,56 +7086,56 @@ process.env.EXPO_BACKEND_URL ||
             </td>
             </tr>
             `,
-          )
-          .join("");
+        )
+        .join("");
 
-          const decisionHtml =
-          decisionItems
-          .map(
-            (item) => `
+    const decisionHtml =
+      decisionItems
+        .map(
+          (item) => `
             <div class="decision">
             <h3>${escapeHtml(item.title)}</h3>
             <p>${escapeHtml(item.text)}</p>
             </div>
             `,
-          )
-          .join("");
+        )
+        .join("");
 
-          let logoUri = "";
+    let logoUri = "";
 
-          try {
-            const logoSource =
-            Image.resolveAssetSource(
-              require("../metalsense.png"),
-            );
+    try {
+      const logoSource =
+        Image.resolveAssetSource(
+          require("../metalsense.png"),
+        );
 
-            logoUri = logoSource?.uri || "";
-          } catch {
-            logoUri = "";
-          }
+      logoUri = logoSource?.uri || "";
+    } catch {
+      logoUri = "";
+    }
 
-          const logoHtml = logoUri
-          ? `<img class="logo" src="${escapeHtml(logoUri)}" alt="MetalSense logo" />`
-          : "";
+    const logoHtml = logoUri
+      ? `<img class="logo" src="${escapeHtml(logoUri)}" alt="MetalSense logo" />`
+      : "";
 
-          const popup = window.open(
-            "",
-            "_blank",
-            "width=1200,height=900",
-          );
+    const popup = window.open(
+      "",
+      "_blank",
+      "width=1200,height=900",
+    );
 
-          if (!popup) {
-            Alert.alert(
-              "PDF export blocked",
-              "Allow pop-ups for localhost and try again.",
-            );
-            return;
-          }
+    if (!popup) {
+      Alert.alert(
+        "PDF export blocked",
+        "Allow pop-ups for localhost and try again.",
+      );
+      return;
+    }
 
-          const reportTitle =
-          `MetalSense Final Report - ${selectedDataset.filename}`;
+    const reportTitle =
+      `MetalSense Final Report - ${selectedDataset.filename}`;
 
-          const profileHtml = `
+    const profileHtml = `
           <div class="profile-card">
           <div class="profile-avatar">
           ${escapeHtml(initials(user.full_name))}
@@ -6980,7 +7180,7 @@ process.env.EXPO_BACKEND_URL ||
           </div>
           `;
 
-          const datasetEvidenceHtml = `
+    const datasetEvidenceHtml = `
           <div class="metadata-card">
           <div>
           <span>FILE</span>
@@ -7024,45 +7224,45 @@ process.env.EXPO_BACKEND_URL ||
           </div>
           `;
 
-          const latestRows = (selectedDataset.records || [])
-          .slice(0, 10)
-          .map(
-            (row, index) => {
-              const item = metrics[index];
+    const latestRows = (selectedDataset.records || [])
+      .slice(0, 10)
+      .map(
+        (row, index) => {
+          const item = metrics[index];
 
-              return `
+          return `
               <tr>
               <td>${escapeHtml(sampleIdFor(row, index))}</td>
               <td>${escapeHtml(
-                sampleDateFor(row) ??
-                "",
-              )}</td>
+            sampleDateFor(row) ??
+            "",
+          )}</td>
               <td>${escapeHtml(
-                rowLabel(row, [
-                  "country",
-                ]),
-              )}</td>
+            rowLabel(row, [
+              "country",
+            ]),
+          )}</td>
               <td>${escapeHtml(
-                rowLabel(row, [
-                  "area",
-                  "location_name",
-                  "location",
-                ]),
-              )}</td>
+            rowLabel(row, [
+              "area",
+              "location_name",
+              "location",
+            ]),
+          )}</td>
               <td>${escapeHtml(
-                item?.status ||
-                row?.analysis?.status ||
-                "UNKNOWN",
-              )}</td>
+            item?.status ||
+            row?.analysis?.status ||
+            "UNKNOWN",
+          )}</td>
               </tr>
               `;
-            },
-          )
-          .join("");
+        },
+      )
+      .join("");
 
-          popup.document.open();
+    popup.document.open();
 
-          popup.document.write(`
+    popup.document.write(`
           <!doctype html>
           <html>
           <head>
@@ -7375,16 +7575,16 @@ process.env.EXPO_BACKEND_URL ||
           <div class="chart-block metal-chart">
           <h1>Metal concentration profile</h1>
           ${metalStats.length > 0
-            ? `
+        ? `
             <img
             src="${metalGraph}"
             alt="Metal concentration profile chart"
             />
             `
-            : `
+        : `
             <p>No supported metal measurements are available.</p>
             `
-          }
+      }
           </div>
 
           <div class="section-label" style="margin-top:10px;">
@@ -7417,96 +7617,96 @@ process.env.EXPO_BACKEND_URL ||
           </html>
           `);
 
-          popup.document.close();
+    popup.document.close();
 
-          const printWhenReady = async () => {
-            try {
-              const images = Array.from(
-                popup.document.images,
-              );
+    const printWhenReady = async () => {
+      try {
+        const images = Array.from(
+          popup.document.images,
+        );
 
-              await Promise.all(
-                images.map((image) => {
-                  if (image.complete) {
-                    return Promise.resolve();
-                  }
-
-                  return new Promise<void>((resolve) => {
-                    image.onload = () => resolve();
-                    image.onerror = () => resolve();
-                  });
-                }),
-              );
-            } finally {
-              window.setTimeout(() => {
-                try {
-                  popup.focus();
-                  popup.print();
-                } catch { }
-              }, 150);
+        await Promise.all(
+          images.map((image) => {
+            if (image.complete) {
+              return Promise.resolve();
             }
-          };
 
-          if (
-            popup.document.readyState ===
-            "complete"
-          ) {
-            void printWhenReady();
-          } else {
-            popup.onload = () => {
-              void printWhenReady();
-            };
-          }
+            return new Promise<void>((resolve) => {
+              image.onload = () => resolve();
+              image.onerror = () => resolve();
+            });
+          }),
+        );
+      } finally {
+        window.setTimeout(() => {
+          try {
+            popup.focus();
+            popup.print();
+          } catch { }
+        }, 150);
+      }
+    };
 
-          window.setTimeout(() => {
-            try {
-              if (
-                popup &&
-                !popup.closed
-              ) {
-                popup.focus();
-                popup.print();
-              }
-            } catch { }
-          }, 1600);
-        };
+    if (
+      popup.document.readyState ===
+      "complete"
+    ) {
+      void printWhenReady();
+    } else {
+      popup.onload = () => {
+        void printWhenReady();
+      };
+    }
 
-        return (
-          <View>
-          <PageIntro
-          eyebrow="EVIDENCE-READY OUTPUT"
-          title="Reports & decisions"
-          description="Select a dataset and review its decision support, pollution profile, trends, and verified sample results."
-          />
+    window.setTimeout(() => {
+      try {
+        if (
+          popup &&
+          !popup.closed
+        ) {
+          popup.focus();
+          popup.print();
+        }
+      } catch { }
+    }, 1600);
+  };
 
-          {/* ====================================================
+  return (
+    <View>
+      <PageIntro
+        eyebrow="EVIDENCE-READY OUTPUT"
+        title="Reports & decisions"
+        description="Select a dataset and review its decision support, pollution profile, trends, and verified sample results."
+      />
+
+      {/* ====================================================
             DATASET SELECTION
             ==================================================== */}
 
-            <View style={styles.panel}>
-            <Text style={styles.panelTitle}>
-            Report dataset
-            </Text>
+      <View style={styles.panel}>
+        <Text style={styles.panelTitle}>
+          Report dataset
+        </Text>
 
-            <Text style={styles.panelSubtitle}>
-            Choose which imported file this report should analyze.
-            </Text>
+        <Text style={styles.panelSubtitle}>
+          Choose which imported file this report should analyze.
+        </Text>
 
-            <View style={styles.reportDatasetList}>
-            {datasets.length === 0 ? (
-              <EmptyState
+        <View style={styles.reportDatasetList}>
+          {datasets.length === 0 ? (
+            <EmptyState
               icon="documents-outline"
               title="No datasets available"
               text="Import a CSV or Excel file first."
-              />
-            ) : (
-              datasets.map((item) => {
-                const active =
+            />
+          ) : (
+            datasets.map((item) => {
+              const active =
                 item.dataset_id ===
                 selectedDatasetId;
 
-                return (
-                  <Pressable
+              return (
+                <Pressable
                   key={item.dataset_id}
                   onPress={() =>
                     setSelectedDatasetId(
@@ -7518,949 +7718,949 @@ process.env.EXPO_BACKEND_URL ||
                     active &&
                     styles.reportDatasetOptionActive,
                   ]}
-                  >
+                >
                   <View
-                  style={
-                    styles.reportDatasetIcon
-                  }
+                    style={
+                      styles.reportDatasetIcon
+                    }
                   >
-                  <Ionicons
-                  name="document-text-outline"
-                  size={19}
-                  color={
-                    active
-                    ? C.green
-                    : C.teal
-                  }
-                  />
+                    <Ionicons
+                      name="document-text-outline"
+                      size={19}
+                      color={
+                        active
+                          ? C.green
+                          : C.teal
+                      }
+                    />
                   </View>
 
                   <View
-                  style={{
-                    flex: 1,
-                  }}
+                    style={{
+                      flex: 1,
+                    }}
                   >
-                  <Text
-                  style={
-                    styles.reportDatasetName
-                  }
-                  >
-                  {item.filename}
-                  </Text>
+                    <Text
+                      style={
+                        styles.reportDatasetName
+                      }
+                    >
+                      {item.filename}
+                    </Text>
 
-                  <Text
-                  style={
-                    styles.reportDatasetMeta
-                  }
-                  >
-                  {item.records?.length ||
-                    0}{" "}
-                    records ·{" "}
-                    {item.columns?.length ||
-                      0}{" "}
+                    <Text
+                      style={
+                        styles.reportDatasetMeta
+                      }
+                    >
+                      {item.records?.length ||
+                        0}{" "}
+                      records ·{" "}
+                      {item.columns?.length ||
+                        0}{" "}
                       columns ·{" "}
                       {prettyDate(
                         item.imported_at,
                       )}
-                      </Text>
+                    </Text>
 
-                      <Text
+                    <Text
                       style={
                         styles.reportDatasetMeta
                       }
-                      >
+                    >
                       {item.data_source ||
                         "Source not provided"}{" "}
-                        ·{" "}
-                        {item.report_id ||
-                          "Report ID not provided"}
-                          </Text>
-                          </View>
-
-                          <View
-                          style={[
-                            styles.reportDatasetRadio,
-                            active &&
-                            styles.reportDatasetRadioActive,
-                          ]}
-                          >
-                          {active && (
-                            <View
-                            style={
-                              styles.reportDatasetRadioInner
-                            }
-                            />
-                          )}
-                          </View>
-                          </Pressable>
-                );
-              })
-            )}
-            </View>
-            </View>
-
-            {!selectedDataset ? (
-              <EmptyState
-              icon="analytics-outline"
-              title="No report data"
-              text="Select or import a dataset."
-              />
-            ) : (
-              <>
-              {/* ==================================================
-                REPORT OVERVIEW
-                ================================================== */}
-
-                <View style={styles.panel}>
-                <View
-                style={
-                  styles.reportHeadingRow
-                }
-                >
-                <View
-                style={{
-                  flex: 1,
-                }}
-                >
-                <Text
-                style={
-                  styles.panelTitle
-                }
-                >
-                Report overview
-                </Text>
-
-                <Text
-                style={
-                  styles.panelSubtitle
-                }
-                >
-                {
-                  selectedDataset.filename
-                }{" "}
-                ·{" "}
-                {metrics.length}{" "}
-                samples
-                </Text>
-                </View>
-
-                <View
-                style={
-                  styles.reportStatusPill
-                }
-                >
-                <Text
-                style={
-                  styles.reportStatusPillText
-                }
-                >
-                {highCount > 0
-                  ? "REVIEW REQUIRED"
-                  : "WITHIN CURRENT THRESHOLDS"}
-                  </Text>
-                  </View>
+                      ·{" "}
+                      {item.report_id ||
+                        "Report ID not provided"}
+                    </Text>
                   </View>
 
                   <View
-                  style={
-                    styles.reportGrid
-                  }
+                    style={[
+                      styles.reportDatasetRadio,
+                      active &&
+                      styles.reportDatasetRadioActive,
+                    ]}
                   >
-                  <ReportCell
-                  label="AVERAGE HPI"
-                  value={averageHpi.toFixed(2)}
-                  />
-
-                  <ReportCell
-                  label="AVERAGE HEI"
-                  value={averageHei.toFixed(2)}
-                  />
-
-                  <ReportCell
-                  label="HIGH-RISK SAMPLES"
-                  value={String(highCount)}
-                  />
-
-                  <ReportCell
-                  label="LEADING METAL"
-                  value={leadingMetal}
-                  />
-
-                  <ReportCell
-                  label="QUALITY SCORE"
-                  value={String(
-                    Math.round(
-                      selectedDataset.quality?.score ?? 0,
-                    ),
-                  )}
-                  />
-
-                  <ReportCell
-                  label="RECORDS"
-                  value={String(
-                    selectedDataset.records?.length ?? 0,
-                  )}
-                  />
+                    {active && (
+                      <View
+                        style={
+                          styles.reportDatasetRadioInner
+                        }
+                      />
+                    )}
                   </View>
-                  </View>
+                </Pressable>
+              );
+            })
+          )}
+        </View>
+      </View>
 
-                  {/* ==================================================
+      {!selectedDataset ? (
+        <EmptyState
+          icon="analytics-outline"
+          title="No report data"
+          text="Select or import a dataset."
+        />
+      ) : (
+        <>
+          {/* ==================================================
+                REPORT OVERVIEW
+                ================================================== */}
+
+          <View style={styles.panel}>
+            <View
+              style={
+                styles.reportHeadingRow
+              }
+            >
+              <View
+                style={{
+                  flex: 1,
+                }}
+              >
+                <Text
+                  style={
+                    styles.panelTitle
+                  }
+                >
+                  Report overview
+                </Text>
+
+                <Text
+                  style={
+                    styles.panelSubtitle
+                  }
+                >
+                  {
+                    selectedDataset.filename
+                  }{" "}
+                  ·{" "}
+                  {metrics.length}{" "}
+                  samples
+                </Text>
+              </View>
+
+              <View
+                style={
+                  styles.reportStatusPill
+                }
+              >
+                <Text
+                  style={
+                    styles.reportStatusPillText
+                  }
+                >
+                  {highCount > 0
+                    ? "REVIEW REQUIRED"
+                    : "WITHIN CURRENT THRESHOLDS"}
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={
+                styles.reportGrid
+              }
+            >
+              <ReportCell
+                label="AVERAGE HPI"
+                value={averageHpi.toFixed(2)}
+              />
+
+              <ReportCell
+                label="AVERAGE HEI"
+                value={averageHei.toFixed(2)}
+              />
+
+              <ReportCell
+                label="HIGH-RISK SAMPLES"
+                value={String(highCount)}
+              />
+
+              <ReportCell
+                label="LEADING METAL"
+                value={leadingMetal}
+              />
+
+              <ReportCell
+                label="QUALITY SCORE"
+                value={String(
+                  Math.round(
+                    selectedDataset.quality?.score ?? 0,
+                  ),
+                )}
+              />
+
+              <ReportCell
+                label="RECORDS"
+                value={String(
+                  selectedDataset.records?.length ?? 0,
+                )}
+              />
+            </View>
+          </View>
+
+          {/* ==================================================
                     DISCUSSION & DECISION
                     ================================================== */}
 
-                    <View style={styles.panel}>
-                    <Text
-                    style={styles.panelTitle}
-                    >
-                    Discussion & decision
-                    support
-                    </Text>
+          <View style={styles.panel}>
+            <Text
+              style={styles.panelTitle}
+            >
+              Discussion & decision
+              support
+            </Text>
 
-                    <Text
-                    style={styles.panelSubtitle}
-                    >
-                    Interpret the calculated
-                    results before taking action.
-                    </Text>
+            <Text
+              style={styles.panelSubtitle}
+            >
+              Interpret the calculated
+              results before taking action.
+            </Text>
 
-                    {decisionItems.map((item) => (
-                      <View
-                      key={item.title}
-                      style={styles.decisionCard}
-                      >
-                      <View
-                      style={[
-                        styles.decisionIcon,
-                        {
-                          backgroundColor: C.mint2,
-                        },
-                      ]}
-                      >
-                      <Ionicons
-                      name={item.icon}
-                      size={20}
-                      color={item.color}
-                      />
-                      </View>
+            {decisionItems.map((item) => (
+              <View
+                key={item.title}
+                style={styles.decisionCard}
+              >
+                <View
+                  style={[
+                    styles.decisionIcon,
+                    {
+                      backgroundColor: C.mint2,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={20}
+                    color={item.color}
+                  />
+                </View>
 
-                      <View
-                      style={{
-                        flex: 1,
-                      }}
-                      >
-                      <Text
-                      style={
-                        styles.decisionTitle
-                      }
-                      >
-                      {item.title}
-                      </Text>
+                <View
+                  style={{
+                    flex: 1,
+                  }}
+                >
+                  <Text
+                    style={
+                      styles.decisionTitle
+                    }
+                  >
+                    {item.title}
+                  </Text>
 
-                      <Text
-                      style={
-                        styles.decisionText
-                      }
-                      >
-                      {item.text}
-                      </Text>
-                      </View>
-                      </View>
-                    ))}
+                  <Text
+                    style={
+                      styles.decisionText
+                    }
+                  >
+                    {item.text}
+                  </Text>
+                </View>
+              </View>
+            ))}
 
-                    {highestHpiSample && (
-                      <View
-                      style={
-                        styles.reportInsight
-                      }
-                      >
-                      <Text
-                      style={
-                        styles.reportInsightLabel
-                      }
-                      >
-                      HIGHEST OBSERVED HPI
-                      </Text>
+            {highestHpiSample && (
+              <View
+                style={
+                  styles.reportInsight
+                }
+              >
+                <Text
+                  style={
+                    styles.reportInsightLabel
+                  }
+                >
+                  HIGHEST OBSERVED HPI
+                </Text>
 
-                      <Text
-                      style={
-                        styles.reportInsightTitle
-                      }
-                      >
-                      {highestHpiSample.id} ·{" "}
-                      {highestHpiSample.status}
-                      </Text>
+                <Text
+                  style={
+                    styles.reportInsightTitle
+                  }
+                >
+                  {highestHpiSample.id} ·{" "}
+                  {highestHpiSample.status}
+                </Text>
 
-                      <Text
-                      style={
-                        styles.reportInsightText
-                      }
-                      >
-                      HPI{" "}
-                      {highestHpiSample.hpi.toFixed(
-                        2,
-                      )}{" "}
-                      · HEI{" "}
-                      {highestHpiSample.hei.toFixed(
-                        2,
-                      )}{" "}
-                      ·{" "}
-                      {highestHpiSample.row?.area ||
-                        highestHpiSample.row?.region ||
-                        "Location not provided"}
-                        .
-                        </Text>
-                        </View>
-                    )}
-                    </View>
+                <Text
+                  style={
+                    styles.reportInsightText
+                  }
+                >
+                  HPI{" "}
+                  {highestHpiSample.hpi.toFixed(
+                    2,
+                  )}{" "}
+                  · HEI{" "}
+                  {highestHpiSample.hei.toFixed(
+                    2,
+                  )}{" "}
+                  ·{" "}
+                  {highestHpiSample.row?.area ||
+                    highestHpiSample.row?.region ||
+                    "Location not provided"}
+                  .
+                </Text>
+              </View>
+            )}
+          </View>
 
-                    {/* ==================================================
+          {/* ==================================================
                       METAL GRAPH
                       ================================================== */}
 
-                      <View style={styles.panel}>
-                      <Text
-                      style={styles.panelTitle}
-                      >
-                      Metal concentration profile
-                      </Text>
+          <View style={styles.panel}>
+            <Text
+              style={styles.panelTitle}
+            >
+              Metal concentration profile
+            </Text>
 
-                      <Text
-                      style={styles.panelSubtitle}
-                      >
-                      Average measured concentration
-                      across supported metals.
-                      </Text>
+            <Text
+              style={styles.panelSubtitle}
+            >
+              Average measured concentration
+              across supported metals.
+            </Text>
 
-                      {metalStats.length === 0 ? (
-                        <EmptyState
-                        icon="flask-outline"
-                        title="No metal measurements"
-                        text="No supported numeric metal values are available."
-                        />
-                      ) : (
-                        metalStats.map((item) => (
-                          <View
-                          key={item.metal}
-                          style={styles.chartRow}
-                          >
-                          <Text
-                          style={
-                            styles.chartLabel
-                          }
-                          >
-                          {item.metal}
-                          </Text>
+            {metalStats.length === 0 ? (
+              <EmptyState
+                icon="flask-outline"
+                title="No metal measurements"
+                text="No supported numeric metal values are available."
+              />
+            ) : (
+              metalStats.map((item) => (
+                <View
+                  key={item.metal}
+                  style={styles.chartRow}
+                >
+                  <Text
+                    style={
+                      styles.chartLabel
+                    }
+                  >
+                    {item.metal}
+                  </Text>
 
-                          <View
-                          style={
-                            styles.chartTrack
-                          }
-                          >
-                          <View
-                          style={[
-                            styles.chartBar,
-                            {
-                              width:
-                              `${Math.max(
-                                4,
-                                (item.average /
+                  <View
+                    style={
+                      styles.chartTrack
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.chartBar,
+                        {
+                          width:
+                            `${Math.max(
+                              4,
+                              (item.average /
                                 maxMetalValue) *
-                                100,
-                              )}%`,
-                              backgroundColor:
-                              C.teal,
-                            },
-                          ]}
-                          />
-                          </View>
+                              100,
+                            )}%`,
+                          backgroundColor:
+                            C.teal,
+                        },
+                      ]}
+                    />
+                  </View>
 
-                          <Text
-                          style={
-                            styles.chartValue
-                          }
-                          >
-                          {item.average.toFixed(3)}
-                          </Text>
-                          </View>
-                        ))
-                      )}
-                      </View>
+                  <Text
+                    style={
+                      styles.chartValue
+                    }
+                  >
+                    {item.average.toFixed(3)}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
 
-                      {/* ==================================================
+          {/* ==================================================
                         FULL RESULTS TABLE
                         ================================================== */}
 
-                        <View
-                        style={
-                          styles.sectionHeadingRow
-                        }
-                        >
-                        <Text
-                        style={
-                          styles.sectionHeading
-                        }
-                        >
-                        FULL RESULTS TABLE
-                        </Text>
-                        </View>
+          <View
+            style={
+              styles.sectionHeadingRow
+            }
+          >
+            <Text
+              style={
+                styles.sectionHeading
+              }
+            >
+              FULL RESULTS TABLE
+            </Text>
+          </View>
 
-                        <View style={styles.panel}>
-                        <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator
-                        >
-                        <View
-                        style={
-                          styles.resultsTable
-                        }
-                        >
-                        <View
+          <View style={styles.panel}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator
+            >
+              <View
+                style={
+                  styles.resultsTable
+                }
+              >
+                <View
+                  style={[
+                    styles.resultTableRow,
+                    styles.resultTableHeader,
+                  ]}
+                >
+                  {[
+                    "ID",
+                    "DATE",
+                    "LATITUDE",
+                    "LONGITUDE",
+                    "HPI",
+                    "HEI",
+                    "Cd",
+                    "STATUS",
+                  ].map((label) => (
+                    <Text
+                      key={label}
+                      style={[
+                        styles.resultTableCell,
+                        styles.resultTableHeaderText,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  ))}
+                </View>
+
+                {metrics.map((item) => {
+                  const status =
+                    item.status;
+
+                  return (
+                    <View
+                      key={`result-${item.id}`}
+                      style={
+                        styles.resultTableRow
+                      }
+                    >
+                      <Text
                         style={[
-                          styles.resultTableRow,
-                          styles.resultTableHeader,
+                          styles.resultTableCell,
+                          styles.resultTableId,
                         ]}
-                        >
-                        {[
-                          "ID",
-                          "DATE",
-                          "LATITUDE",
-                          "LONGITUDE",
-                          "HPI",
-                          "HEI",
-                          "Cd",
-                          "STATUS",
-                        ].map((label) => (
-                          <Text
-                          key={label}
+                      >
+                        {item.id}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.resultTableCell
+                        }
+                      >
+                        {String(
+                          item.row?.date ??
+                          "",
+                        )}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.resultTableCell
+                        }
+                      >
+                        {item.lat.toFixed(4)}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.resultTableCell
+                        }
+                      >
+                        {item.lon.toFixed(4)}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.resultTableCell
+                        }
+                      >
+                        {item.hpi.toFixed(2)}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.resultTableCell
+                        }
+                      >
+                        {item.hei.toFixed(2)}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.resultTableCell
+                        }
+                      >
+                        {item.cd.toFixed(2)}
+                      </Text>
+
+                      <View
+                        style={[
+                          styles.resultStatus,
+                          {
+                            backgroundColor:
+                              status ===
+                                "HIGH" ||
+                                status ===
+                                "CRITICAL"
+                                ? C.mint2
+                                : status ===
+                                  "LOW" ||
+                                  status ===
+                                  "SAFE"
+                                  ? C.mint2
+                                  : C.mint2,
+                          },
+                        ]}
+                      >
+                        <Text
                           style={[
-                            styles.resultTableCell,
-                            styles.resultTableHeaderText,
+                            styles.resultStatusText,
+                            {
+                              color:
+                                status ===
+                                  "HIGH" ||
+                                  status ===
+                                  "CRITICAL"
+                                  ? C.danger
+                                  : status ===
+                                    "LOW" ||
+                                    status ===
+                                    "SAFE"
+                                    ? C.green
+                                    : C.warning,
+                            },
                           ]}
-                          >
-                          {label}
-                          </Text>
-                        ))}
-                        </View>
+                        >
+                          {status}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
 
-                        {metrics.map((item) => {
-                          const status =
-                          item.status;
-
-                          return (
-                            <View
-                            key={`result-${item.id}`}
-                            style={
-                              styles.resultTableRow
-                            }
-                            >
-                            <Text
-                            style={[
-                              styles.resultTableCell,
-                              styles.resultTableId,
-                            ]}
-                            >
-                            {item.id}
-                            </Text>
-
-                            <Text
-                            style={
-                              styles.resultTableCell
-                            }
-                            >
-                            {String(
-                              item.row?.date ??
-                              "",
-                            )}
-                            </Text>
-
-                            <Text
-                            style={
-                              styles.resultTableCell
-                            }
-                            >
-                            {item.lat.toFixed(4)}
-                            </Text>
-
-                            <Text
-                            style={
-                              styles.resultTableCell
-                            }
-                            >
-                            {item.lon.toFixed(4)}
-                            </Text>
-
-                            <Text
-                            style={
-                              styles.resultTableCell
-                            }
-                            >
-                            {item.hpi.toFixed(2)}
-                            </Text>
-
-                            <Text
-                            style={
-                              styles.resultTableCell
-                            }
-                            >
-                            {item.hei.toFixed(2)}
-                            </Text>
-
-                            <Text
-                            style={
-                              styles.resultTableCell
-                            }
-                            >
-                            {item.cd.toFixed(2)}
-                            </Text>
-
-                            <View
-                            style={[
-                              styles.resultStatus,
-                              {
-                                backgroundColor:
-                                status ===
-                                "HIGH" ||
-                                status ===
-                                "CRITICAL"
-                                ? C.mint2
-                                : status ===
-                                "LOW" ||
-                                status ===
-                                "SAFE"
-                                ? C.mint2
-                                : C.mint2,
-                              },
-                            ]}
-                            >
-                            <Text
-                            style={[
-                              styles.resultStatusText,
-                              {
-                                color:
-                                status ===
-                                "HIGH" ||
-                                status ===
-                                "CRITICAL"
-                                ? C.danger
-                                : status ===
-                                "LOW" ||
-                                status ===
-                                "SAFE"
-                                ? C.green
-                                : C.warning,
-                              },
-                            ]}
-                            >
-                            {status}
-                            </Text>
-                            </View>
-                            </View>
-                          );
-                        })}
-                        </View>
-                        </ScrollView>
-                        </View>
-
-                        {/* ==================================================
+          {/* ==================================================
                           EXPORT
                           ================================================== */}
 
-                          <View
-                          style={styles.exportRow}
-                          >
-                          <Pressable
-                          style={
-                            styles.importButton
-                          }
-                          onPress={exportCsv}
-                          >
-                          <Ionicons
-                          name="download-outline"
-                          size={19}
-                          color={C.white}
-                          />
+          <View
+            style={styles.exportRow}
+          >
+            <Pressable
+              style={
+                styles.importButton
+              }
+              onPress={exportCsv}
+            >
+              <Ionicons
+                name="download-outline"
+                size={19}
+                color={C.white}
+              />
 
-                          <Text
-                          style={
-                            styles.importButtonText
-                          }
-                          >
-                          Export CSV
-                          </Text>
-                          </Pressable>
+              <Text
+                style={
+                  styles.importButtonText
+                }
+              >
+                Export CSV
+              </Text>
+            </Pressable>
 
-                          <Pressable
-                          style={[
-                            styles.importButton,
-                            styles.pdfButton,
-                          ]}
-                          onPress={
-                            exportPdfSummary
-                          }
-                          >
-                          <Ionicons
-                          name="document-text-outline"
-                          size={19}
-                          color={C.white}
-                          />
+            <Pressable
+              style={[
+                styles.importButton,
+                styles.pdfButton,
+              ]}
+              onPress={
+                exportPdfSummary
+              }
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={19}
+                color={C.white}
+              />
 
-                          <Text
-                          style={
-                            styles.importButtonText
-                          }
-                          >
-                          Export PDF summary
-                          </Text>
-                          </Pressable>
+              <Text
+                style={
+                  styles.importButtonText
+                }
+              >
+                Export PDF summary
+              </Text>
+            </Pressable>
 
-                          <Text
-                          style={
-                            styles.exportHint
-                          }
-                          >
-                          CSV includes the selected
-                          dataset, original measurements,
-                 metadata, and calculated indices.
-                 PDF uses the browser print dialog.
-                 </Text>
-                 </View>
-                 </>
-            )}
-            </View>
-        );
-  }
+            <Text
+              style={
+                styles.exportHint
+              }
+            >
+              CSV includes the selected
+              dataset, original measurements,
+              metadata, and calculated indices.
+              PDF uses the browser print dialog.
+            </Text>
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   R EPORT CELL *
-   *   ============================================================ */
+/* ============================================================
+ *   R EPORT CELL *
+ *   ============================================================ */
 
-  function ReportCell({
-    label,
-    value,
-  }: {
-    label: string;
-    value: string;
-  }) {
-    return (
-      <View
+function ReportCell({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <View
       style={
         styles.reportCell
       }
-      >
+    >
       <Text
-      style={
-        styles.reportCellLabel
-      }
+        style={
+          styles.reportCellLabel
+        }
       >
-      {label}
+        {label}
       </Text>
 
       <Text
-      style={
-        styles.reportCellValue
-      }
-      numberOfLines={2}
+        style={
+          styles.reportCellValue
+        }
+        numberOfLines={2}
       >
-      {value}
+        {value}
       </Text>
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   P ROFILE     *
-   *   ============================================================ */
+/* ============================================================
+ *   P ROFILE     *
+ *   ============================================================ */
 
-  function ProfileScreen({
-    user,
-    signOut,
-  }: {
-    user: User;
-    signOut: () => Promise<void>;
-  }) {
-    return (
-      <View>
+function ProfileScreen({
+  user,
+  signOut,
+}: {
+  user: User;
+  signOut: () => Promise<void>;
+}) {
+  return (
+    <View>
       <PageIntro
-      eyebrow="ACCOUNT"
-      title="Profile"
-      description=""
+        eyebrow="ACCOUNT"
+        title="Profile"
+        description=""
       />
 
       <View
-      style={
-        styles.profilePanel
-      }
+        style={
+          styles.profilePanel
+        }
       >
-      <Text
-      style={
-        styles.profileName
-      }
-      >
-      {
-        user.full_name
-      }
-      </Text>
+        <Text
+          style={
+            styles.profileName
+          }
+        >
+          {
+            user.full_name
+          }
+        </Text>
 
-      <Text
-      style={
-        styles.profileEmail
-      }
-      >
-      {
-        user.email
-      }
-      </Text>
+        <Text
+          style={
+            styles.profileEmail
+          }
+        >
+          {
+            user.email
+          }
+        </Text>
 
-      <View
-      style={
-        styles.profileIdentity
-      }
-      >
-      <View
-      style={
-        styles.profileAvatar
-      }
-      >
-      <Text
-      style={
-        styles.profileAvatarText
-      }
-      >
-      {initials(
-        user.full_name,
-      )}
-      </Text>
+        <View
+          style={
+            styles.profileIdentity
+          }
+        >
+          <View
+            style={
+              styles.profileAvatar
+            }
+          >
+            <Text
+              style={
+                styles.profileAvatarText
+              }
+            >
+              {initials(
+                user.full_name,
+              )}
+            </Text>
+          </View>
+
+          <View>
+            <Text
+              style={
+                styles.profileRole
+              }
+            >
+              {
+                user.role
+              }
+            </Text>
+
+            <Text
+              style={
+                styles.profileType
+              }
+            >
+              {
+                user.account_type ||
+                "Other"
+              }
+            </Text>
+          </View>
+        </View>
+
+        <View
+          style={
+            styles.profileGrid
+          }
+        >
+          <ReportCell
+            label="ORGANIZATION"
+            value={
+              user.organization ||
+              "Not provided"
+            }
+          />
+
+          <ReportCell
+            label="INSTITUTION"
+            value={
+              user.institution ||
+              "Not provided"
+            }
+          />
+
+          <ReportCell
+            label="RESEARCH AREA"
+            value={
+              user.research_area ||
+              "Not provided"
+            }
+          />
+
+          <View
+            style={[
+              styles.reportCell,
+              {
+                flexBasis:
+                  "100%",
+              },
+            ]}
+          >
+            <Text
+              style={
+                styles.reportCellLabel
+              }
+            >
+              ACCOUNT CREATED
+            </Text>
+
+            <Text
+              style={
+                styles.reportCellValue
+              }
+            >
+              {
+                prettyDate(
+                  user.created_at,
+                )
+              }
+            </Text>
+          </View>
+        </View>
+
+        <Pressable
+          style={({
+            pressed,
+          }) => [
+              styles.signOutButton,
+              pressed && {
+                opacity: 0.7,
+              },
+            ]}
+          onPress={
+            signOut
+          }
+        >
+          <Ionicons
+            name="log-out-outline"
+            size={18}
+            color={
+              C.danger
+            }
+          />
+
+          <Text
+            style={
+              styles.signOutText
+            }
+          >
+            Sign out
+          </Text>
+        </Pressable>
       </View>
+    </View>
+  );
+}
 
-      <View>
-      <Text
-      style={
-        styles.profileRole
-      }
-      >
-      {
-        user.role
-      }
-      </Text>
+/* ============================================================
+ *   E MPTY STATE *
+ *   ============================================================ */
 
-      <Text
-      style={
-        styles.profileType
-      }
-      >
-      {
-        user.account_type ||
-        "Other"
-      }
-      </Text>
-      </View>
-      </View>
-
-      <View
-      style={
-        styles.profileGrid
-      }
-      >
-      <ReportCell
-      label="ORGANIZATION"
-      value={
-        user.organization ||
-        "Not provided"
-      }
-      />
-
-      <ReportCell
-      label="INSTITUTION"
-      value={
-        user.institution ||
-        "Not provided"
-      }
-      />
-
-      <ReportCell
-      label="RESEARCH AREA"
-      value={
-        user.research_area ||
-        "Not provided"
-      }
-      />
-
-      <View
-      style={[
-        styles.reportCell,
-        {
-          flexBasis:
-          "100%",
-        },
-      ]}
-      >
-      <Text
-      style={
-        styles.reportCellLabel
-      }
-      >
-      ACCOUNT CREATED
-      </Text>
-
-      <Text
-      style={
-        styles.reportCellValue
-      }
-      >
-      {
-        prettyDate(
-          user.created_at,
-        )
-      }
-      </Text>
-      </View>
-      </View>
-
-      <Pressable
-      style={({
-        pressed,
-      }) => [
-        styles.signOutButton,
-        pressed && {
-          opacity: 0.7,
-        },
-      ]}
-      onPress={
-        signOut
-      }
-      >
-      <Ionicons
-      name="log-out-outline"
-      size={18}
-      color={
-        C.danger
-      }
-      />
-
-      <Text
-      style={
-        styles.signOutText
-      }
-      >
-      Sign out
-      </Text>
-      </Pressable>
-      </View>
-      </View>
-    );
-  }
-
-  /* ============================================================
-   *   E MPTY STATE *
-   *   ============================================================ */
-
-  // Shared empty-state message
-  function EmptyState({
-    icon,
-    title,
-    text,
-  }: {
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    text: string;
-  }) {
-    return (
-      <View
+// Shared empty-state message
+function EmptyState({
+  icon,
+  title,
+  text,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  text: string;
+}) {
+  return (
+    <View
       style={
         styles.empty
       }
-      >
+    >
       <Ionicons
-      name={icon}
-      size={28}
-      color={
-        C.teal
-      }
+        name={icon}
+        size={28}
+        color={
+          C.teal
+        }
       />
 
       <Text
-      style={
-        styles.emptyTitle
-      }
+        style={
+          styles.emptyTitle
+        }
       >
-      {title}
+        {title}
       </Text>
 
       <Text
-      style={
-        styles.emptyText
-      }
+        style={
+          styles.emptyText
+        }
       >
-      {text}
+        {text}
       </Text>
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
 
-  function TemporalTrendAnalysis({
-    dataset,
-  }: {
-    dataset?: Dataset;
-  }) {
-    const [granularity, setGranularity] = useState<"hour" | "day" | "month" | "year">("month");
-    const [selectedMetals, setSelectedMetals] = useState<string[]>(["Pb", "Cd", "As", "Cr", "Cu", "Zn"]);
-    const [hovered, setHovered] = useState<{ metal: string; index: number } | null>(null);
-    const [zoom, setZoom] = useState(1);
-    const [comparison, setComparison] = useState(false);
-    const { width: windowWidth } = useWindowDimensions();
-    const compact = windowWidth < 900;
+function TemporalTrendAnalysis({
+  dataset,
+}: {
+  dataset?: Dataset;
+}) {
+  const [granularity, setGranularity] = useState<"hour" | "day" | "month" | "year">("month");
+  const [selectedMetals, setSelectedMetals] = useState<string[]>(["Pb", "Cd", "As", "Cr", "Cu", "Zn"]);
+  const [hovered, setHovered] = useState<{ metal: string; index: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [comparison, setComparison] = useState(false);
+  const { width: windowWidth } = useWindowDimensions();
+  const compact = windowWidth < 900;
 
-    const palette: Record<string, string> = {
-      Pb: "#5B5BD6",
-      Cd: "#D65B8A",
-      As: "#E49A3A",
-      Cr: "#1A9B7B",
-      Cu: "#2E86DE",
-      Zn: "#8E5BD6",
-      Ni: "#D65B5B",
-      Fe: "#9B6B43",
-      Mn: "#4E8E5D",
-    };
+  const palette: Record<string, string> = {
+    Pb: "#5B5BD6",
+    Cd: "#D65B8A",
+    As: "#E49A3A",
+    Cr: "#1A9B7B",
+    Cu: "#2E86DE",
+    Zn: "#8E5BD6",
+    Ni: "#D65B5B",
+    Fe: "#9B6B43",
+    Mn: "#4E8E5D",
+  };
 
-    const trendData = useMemo(() => {
-      const records = dataset?.records || [];
-      const groups = new Map<string, { timestamp: number; values: Record<string, number[]> }>();
+  const trendData = useMemo(() => {
+    const records = dataset?.records || [];
+    const groups = new Map<string, { timestamp: number; values: Record<string, number[]> }>();
 
-      records.forEach((row) => {
-        const rawDate = sampleDateFor(row);
-        if (!rawDate) return;
-        const parsed = new Date(String(rawDate).replace(" ", "T"));
-        if (Number.isNaN(parsed.getTime())) return;
+    records.forEach((row) => {
+      const rawDate = sampleDateFor(row);
+      if (!rawDate) return;
+      const parsed = new Date(String(rawDate).replace(" ", "T"));
+      if (Number.isNaN(parsed.getTime())) return;
 
-        let key = "";
-        if (granularity === "hour") {
-          key = `parsed.getFullYear()-{String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")} ${String(parsed.getHours()).padStart(2, "0")}:00`;
-        } else if (granularity === "day") {
-          key = `parsed.getFullYear()-{String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
-        } else if (granularity === "month") {
-          key = `parsed.getFullYear()-{String(parsed.getMonth() + 1).padStart(2, "0")}`;
-        } else {
-          key = String(parsed.getFullYear());
-        }
+      let key = "";
+      if (granularity === "hour") {
+        key = `parsed.getFullYear()-{String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")} ${String(parsed.getHours()).padStart(2, "0")}:00`;
+      } else if (granularity === "day") {
+        key = `parsed.getFullYear()-{String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+      } else if (granularity === "month") {
+        key = `parsed.getFullYear()-{String(parsed.getMonth() + 1).padStart(2, "0")}`;
+      } else {
+        key = String(parsed.getFullYear());
+      }
 
-        if (!groups.has(key)) {
-          groups.set(key, { timestamp: parsed.getTime(), values: {} });
-        }
+      if (!groups.has(key)) {
+        groups.set(key, { timestamp: parsed.getTime(), values: {} });
+      }
 
-        const group = groups.get(key)!;
-        group.timestamp = Math.min(group.timestamp, parsed.getTime());
+      const group = groups.get(key)!;
+      group.timestamp = Math.min(group.timestamp, parsed.getTime());
 
-        SUPPORTED_METALS.forEach((metal) => {
-          const raw = findField(row, [metal]);
-          const value = Number(raw);
-          if (!Number.isFinite(value)) return;
-          if (!group.values[metal]) group.values[metal] = [];
-          group.values[metal].push(value);
-        });
+      SUPPORTED_METALS.forEach((metal) => {
+        const raw = findField(row, [metal]);
+        const value = Number(raw);
+        if (!Number.isFinite(value)) return;
+        if (!group.values[metal]) group.values[metal] = [];
+        group.values[metal].push(value);
       });
+    });
 
-      return Array.from(groups.entries())
+    return Array.from(groups.entries())
       .map(([label, group]) => ({
         label,
         timestamp: group.timestamp,
@@ -8472,78 +8672,78 @@ process.env.EXPO_BACKEND_URL ||
         ) as Record<string, number>,
       }))
       .sort((a, b) => a.timestamp - b.timestamp);
-    }, [dataset, granularity]);
+  }, [dataset, granularity]);
 
-    const visibleMetals = selectedMetals.filter((metal) =>
+  const visibleMetals = selectedMetals.filter((metal) =>
     trendData.some((point) => Number.isFinite(point.values[metal])),
-    );
+  );
 
-    const values = trendData.flatMap((point) =>
+  const values = trendData.flatMap((point) =>
     visibleMetals
-    .map((metal) => point.values[metal])
-    .filter((value) => Number.isFinite(value)),
-    );
+      .map((metal) => point.values[metal])
+      .filter((value) => Number.isFinite(value)),
+  );
 
-    const average = values.length
+  const average = values.length
     ? values.reduce((sum, value) => sum + value, 0) / values.length
     : 0;
-    const peak = values.length ? Math.max(...values) : 0;
-    const midpoint = Math.max(1, Math.floor(trendData.length / 2));
-    const previousPoints = trendData.slice(0, midpoint);
-    const currentPoints = trendData.slice(midpoint);
-    const previousValues = previousPoints.flatMap((point) =>
+  const peak = values.length ? Math.max(...values) : 0;
+  const midpoint = Math.max(1, Math.floor(trendData.length / 2));
+  const previousPoints = trendData.slice(0, midpoint);
+  const currentPoints = trendData.slice(midpoint);
+  const previousValues = previousPoints.flatMap((point) =>
     visibleMetals
-    .map((metal) => point.values[metal])
-    .filter((value) => Number.isFinite(value)),
-    );
-    const currentValues = currentPoints.flatMap((point) =>
+      .map((metal) => point.values[metal])
+      .filter((value) => Number.isFinite(value)),
+  );
+  const currentValues = currentPoints.flatMap((point) =>
     visibleMetals
-    .map((metal) => point.values[metal])
-    .filter((value) => Number.isFinite(value)),
-    );
-    const previousAverage = previousValues.length
+      .map((metal) => point.values[metal])
+      .filter((value) => Number.isFinite(value)),
+  );
+  const previousAverage = previousValues.length
     ? previousValues.reduce((sum, value) => sum + value, 0) / previousValues.length
     : 0;
-    const currentAverage = currentValues.length
+  const currentAverage = currentValues.length
     ? currentValues.reduce((sum, value) => sum + value, 0) / currentValues.length
     : average;
-    const changeRate = previousAverage
+  const changeRate = previousAverage
     ? ((currentAverage - previousAverage) / previousAverage) * 100
     : 0;
-    const trendDirection = changeRate > 5 ? "Increasing" : changeRate < -5 ? "Decreasing" : "Stable";
+  const trendDirection = changeRate > 5 ? "Increasing" : changeRate < -5 ? "Decreasing" : "Stable";
 
-    const mean = values.length ? average : 0;
-    const std = values.length > 1
+  const mean = values.length ? average : 0;
+  const std = values.length > 1
     ? Math.sqrt(values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / values.length)
     : 0;
-    const alertIndexes = new Set<number>();
-    trendData.forEach((point, index) => {
-      if (visibleMetals.some((metal) => {
-        const value = point.values[metal];
-        return Number.isFinite(value) && std > 0 && value > mean + 2 * std;
-      })) {
-        alertIndexes.add(index);
-      }
-    });
+  const alertIndexes = new Set<number>();
+  trendData.forEach((point, index) => {
+    if (visibleMetals.some((metal) => {
+      const value = point.values[metal];
+      return Number.isFinite(value) && std > 0 && value > mean + 2 * std;
+    })) {
+      alertIndexes.add(index);
+    }
+  });
 
-    const chartWidth = Math.max(760, 760 * zoom);
-    const chartHeight = 320;
-    const padding = { left: 52, right: 20, top: 20, bottom: 42 };
-    const innerWidth = chartWidth - padding.left - padding.right;
-    const innerHeight = chartHeight - padding.top - padding.bottom;
-    const maxValue = Math.max(peak, 1);
-    const minValue = values.length ? Math.min(...values) : 0;
-    const range = Math.max(maxValue - minValue, maxValue * 0.08, 1);
-    const yMin = Math.max(0, minValue - range * 0.08);
-    const yMax = maxValue + range * 0.08;
+  const chartWidth = Math.max(760, 760 * zoom);
+  const chartHeight = 320;
+  const padding = { left: 52, right: 20, top: 20, bottom: 42 };
+  const innerWidth = chartWidth - padding.left - padding.right;
+  const innerHeight = chartHeight - padding.top - padding.bottom;
+  const maxValue = Math.max(peak, 1);
+  const minValue = values.length ? Math.min(...values) : 0;
+  const range = Math.max(maxValue - minValue, maxValue * 0.08, 1);
+  const yMin = Math.max(0, minValue - range * 0.08);
+  const yMax = maxValue + range * 0.08;
 
-    const pointXY = (index: number, value: number) => ({
-      x: padding.left + (trendData.length <= 1 ? innerWidth / 2 : (index / (trendData.length - 1)) * innerWidth),
-                                                       y: padding.top + innerHeight - ((value - yMin) / Math.max(yMax - yMin, 1)) * innerHeight,
-    });
+  const pointXY = (index: number, value: number) => ({
+    x: padding.left + (trendData.length <= 1 ? innerWidth / 2 : (index / (trendData.length - 1)) * innerWidth),
+    y: padding.top + innerHeight - ((value - yMin) / Math.max(yMax - yMin, 1)) * innerHeight,
+  });
 
-    const makePath = (metal: string) => {
-      const points = trendData
+  const makePath = (metal: string) => {
+    const points = trendData
       .map((point, index) => {
         const value = point.values[metal];
         if (!Number.isFinite(value)) return null;
@@ -8551,2738 +8751,2738 @@ process.env.EXPO_BACKEND_URL ||
       })
       .filter(Boolean) as { x: number; y: number }[];
 
-      if (!points.length) return "";
-      if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+    if (!points.length) return "";
+    if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
 
-      let path = `M ${points[0].x} ${points[0].y}`;
-      for (let i = 1; i < points.length; i += 1) {
-        const previous = points[i - 1];
-        const current = points[i];
-        const controlX = (previous.x + current.x) / 2;
-        path += ` C ${controlX} ${previous.y}, ${controlX} ${current.y}, ${current.x} ${current.y}`;
-      }
-      return path;
-    };
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i += 1) {
+      const previous = points[i - 1];
+      const current = points[i];
+      const controlX = (previous.x + current.x) / 2;
+      path += ` C ${controlX} ${previous.y}, ${controlX} ${current.y}, ${current.x} ${current.y}`;
+    }
+    return path;
+  };
 
-    const toggleMetal = (metal: string) => {
-      setSelectedMetals((current) =>
+  const toggleMetal = (metal: string) => {
+    setSelectedMetals((current) =>
       current.includes(metal)
-      ? current.filter((item) => item !== metal)
-      : [...current, metal],
-      );
-    };
+        ? current.filter((item) => item !== metal)
+        : [...current, metal],
+    );
+  };
 
-    const formatLabel = (label: string) => {
-      if (granularity === "year") return label;
-      if (granularity === "month") return label;
-      if (granularity === "day") return label.slice(5);
-      return label.slice(11);
-    };
+  const formatLabel = (label: string) => {
+    if (granularity === "year") return label;
+    if (granularity === "month") return label;
+    if (granularity === "day") return label.slice(5);
+    return label.slice(11);
+  };
 
-    return (
-      <View style={styles.temporalPanel}>
+  return (
+    <View style={styles.temporalPanel}>
       <View style={styles.temporalHeader}>
-      <View style={styles.temporalHeaderText}>
-      <Text style={styles.panelTitle}>Temporal Trend Analysis</Text>
-      <Text style={styles.panelSubtitle}>
-      Graph Name: Temporal Pollution Trend Analysis · Historical heavy-metal concentration trends
-      </Text>
-      </View>
-      <View style={styles.temporalHeaderBadge}>
-      <Ionicons name="pulse-outline" size={16} color={C.teal} />
-      <Text style={styles.temporalHeaderBadgeText}>{alertIndexes.size} alerts</Text>
-      </View>
+        <View style={styles.temporalHeaderText}>
+          <Text style={styles.panelTitle}>Temporal Trend Analysis</Text>
+          <Text style={styles.panelSubtitle}>
+            Graph Name: Temporal Pollution Trend Analysis · Historical heavy-metal concentration trends
+          </Text>
+        </View>
+        <View style={styles.temporalHeaderBadge}>
+          <Ionicons name="pulse-outline" size={16} color={C.teal} />
+          <Text style={styles.temporalHeaderBadgeText}>{alertIndexes.size} alerts</Text>
+        </View>
       </View>
 
       <View style={styles.temporalControls}>
-      <View style={styles.temporalControlGroup}>
-      <Text style={styles.temporalControlLabel}>TIME SCALE</Text>
-      {(["hour", "day", "month", "year"] as const).map((item) => (
-        <Pressable
-        key={item}
-        onPress={() => setGranularity(item)}
-        style={[styles.temporalFilter, granularity === item && styles.temporalFilterActive]}
-        >
-        <Text style={[styles.temporalFilterText, granularity === item && styles.temporalFilterTextActive]}>
-        {item === "hour" ? "Hourly" : item === "day" ? "Daily" : item === "month" ? "Monthly" : "Yearly"}
-        </Text>
-        </Pressable>
-      ))}
-      </View>
+        <View style={styles.temporalControlGroup}>
+          <Text style={styles.temporalControlLabel}>TIME SCALE</Text>
+          {(["hour", "day", "month", "year"] as const).map((item) => (
+            <Pressable
+              key={item}
+              onPress={() => setGranularity(item)}
+              style={[styles.temporalFilter, granularity === item && styles.temporalFilterActive]}
+            >
+              <Text style={[styles.temporalFilterText, granularity === item && styles.temporalFilterTextActive]}>
+                {item === "hour" ? "Hourly" : item === "day" ? "Daily" : item === "month" ? "Monthly" : "Yearly"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
 
-      <View style={styles.temporalControlGroup}>
-      <Pressable
-      onPress={() => setComparison((value) => !value)}
-      style={[styles.temporalAction, comparison && styles.temporalActionActive]}
-      >
-      <Ionicons name="git-compare-outline" size={15} color={comparison ? C.white : C.teal} />
-      <Text style={[styles.temporalActionText, comparison && styles.temporalActionTextActive]}>Compare period</Text>
-      </Pressable>
-      <Pressable
-      onPress={() => setZoom((value) => Math.max(1, Number((value - 0.25).toFixed(2))))}
-      style={styles.temporalIconButton}
-      >
-      <Ionicons name="remove-outline" size={17} color={C.text} />
-      </Pressable>
-      <Pressable
-      onPress={() => setZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))}
-      style={styles.temporalIconButton}
-      >
-      <Ionicons name="add-outline" size={17} color={C.text} />
-      </Pressable>
-      </View>
+        <View style={styles.temporalControlGroup}>
+          <Pressable
+            onPress={() => setComparison((value) => !value)}
+            style={[styles.temporalAction, comparison && styles.temporalActionActive]}
+          >
+            <Ionicons name="git-compare-outline" size={15} color={comparison ? C.white : C.teal} />
+            <Text style={[styles.temporalActionText, comparison && styles.temporalActionTextActive]}>Compare period</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setZoom((value) => Math.max(1, Number((value - 0.25).toFixed(2))))}
+            style={styles.temporalIconButton}
+          >
+            <Ionicons name="remove-outline" size={17} color={C.text} />
+          </Pressable>
+          <Pressable
+            onPress={() => setZoom((value) => Math.min(3, Number((value + 0.25).toFixed(2))))}
+            style={styles.temporalIconButton}
+          >
+            <Ionicons name="add-outline" size={17} color={C.text} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.temporalLegendWrap}>
-      {SUPPORTED_METALS.map((metal) => {
-        const active = selectedMetals.includes(metal);
-        return (
-          <Pressable key={metal} onPress={() => toggleMetal(metal)} style={[styles.temporalLegendItem, !active && styles.temporalLegendItemMuted]}>
-          <View style={[styles.temporalLegendDot, { backgroundColor: palette[metal] }]} />
-          <Text style={styles.temporalLegendText}>{metal}</Text>
-          </Pressable>
-        );
-      })}
+        {SUPPORTED_METALS.map((metal) => {
+          const active = selectedMetals.includes(metal);
+          return (
+            <Pressable key={metal} onPress={() => toggleMetal(metal)} style={[styles.temporalLegendItem, !active && styles.temporalLegendItemMuted]}>
+              <View style={[styles.temporalLegendDot, { backgroundColor: palette[metal] }]} />
+              <Text style={styles.temporalLegendText}>{metal}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {trendData.length < 2 || visibleMetals.length === 0 ? (
         <View style={styles.temporalEmpty}>
-        <Ionicons name="analytics-outline" size={34} color={C.teal} />
-        <Text style={styles.temporalEmptyTitle}>Temporal data not available</Text>
-        <Text style={styles.temporalEmptyText}>
-        Import records containing a valid date or timestamp and metal concentration values to populate this analysis.
-        </Text>
+          <Ionicons name="analytics-outline" size={34} color={C.teal} />
+          <Text style={styles.temporalEmptyTitle}>Temporal data not available</Text>
+          <Text style={styles.temporalEmptyText}>
+            Import records containing a valid date or timestamp and metal concentration values to populate this analysis.
+          </Text>
         </View>
       ) : (
         <View style={[styles.temporalBody, compact && styles.temporalBodyCompact]}>
-        <View style={[styles.temporalMetrics, compact && styles.temporalMetricsCompact]}>
-        <View style={styles.temporalMetricCard}>
-        <Text style={styles.temporalMetricLabel}>AVERAGE LEVEL</Text>
-        <Text style={styles.temporalMetricValue}>{average.toFixed(3)}</Text>
-        <Text style={styles.temporalMetricHint}>Selected metals</Text>
-        </View>
-        <View style={styles.temporalMetricCard}>
-        <Text style={styles.temporalMetricLabel}>PEAK LEVEL</Text>
-        <Text style={styles.temporalMetricValue}>{peak.toFixed(3)}</Text>
-        <Text style={styles.temporalMetricHint}>Maximum observed</Text>
-        </View>
-        <View style={styles.temporalMetricCard}>
-        <Text style={styles.temporalMetricLabel}>TREND DIRECTION</Text>
-        <View style={styles.temporalTrendValueRow}>
-        <Ionicons
-        name={trendDirection === "Increasing" ? "trending-up-outline" : trendDirection === "Decreasing" ? "trending-down-outline" : "remove-outline"}
-        size={22}
-        color={trendDirection === "Increasing" ? C.danger : trendDirection === "Decreasing" ? C.green : C.warning}
-        />
-        <Text style={styles.temporalMetricValueSmall}>{trendDirection}</Text>
-        </View>
-        <Text style={styles.temporalMetricHint}>Based on period change</Text>
-        </View>
-        <View style={styles.temporalMetricCard}>
-        <Text style={styles.temporalMetricLabel}>CHANGE RATE</Text>
-        <Text style={styles.temporalMetricValue}>{changeRate >= 0 ? "+" : ""}{changeRate.toFixed(1)}%</Text>
-        <Text style={styles.temporalMetricHint}>{comparison ? "Current vs previous" : "First vs latest period"}</Text>
-        </View>
+          <View style={[styles.temporalMetrics, compact && styles.temporalMetricsCompact]}>
+            <View style={styles.temporalMetricCard}>
+              <Text style={styles.temporalMetricLabel}>AVERAGE LEVEL</Text>
+              <Text style={styles.temporalMetricValue}>{average.toFixed(3)}</Text>
+              <Text style={styles.temporalMetricHint}>Selected metals</Text>
+            </View>
+            <View style={styles.temporalMetricCard}>
+              <Text style={styles.temporalMetricLabel}>PEAK LEVEL</Text>
+              <Text style={styles.temporalMetricValue}>{peak.toFixed(3)}</Text>
+              <Text style={styles.temporalMetricHint}>Maximum observed</Text>
+            </View>
+            <View style={styles.temporalMetricCard}>
+              <Text style={styles.temporalMetricLabel}>TREND DIRECTION</Text>
+              <View style={styles.temporalTrendValueRow}>
+                <Ionicons
+                  name={trendDirection === "Increasing" ? "trending-up-outline" : trendDirection === "Decreasing" ? "trending-down-outline" : "remove-outline"}
+                  size={22}
+                  color={trendDirection === "Increasing" ? C.danger : trendDirection === "Decreasing" ? C.green : C.warning}
+                />
+                <Text style={styles.temporalMetricValueSmall}>{trendDirection}</Text>
+              </View>
+              <Text style={styles.temporalMetricHint}>Based on period change</Text>
+            </View>
+            <View style={styles.temporalMetricCard}>
+              <Text style={styles.temporalMetricLabel}>CHANGE RATE</Text>
+              <Text style={styles.temporalMetricValue}>{changeRate >= 0 ? "+" : ""}{changeRate.toFixed(1)}%</Text>
+              <Text style={styles.temporalMetricHint}>{comparison ? "Current vs previous" : "First vs latest period"}</Text>
+            </View>
 
-        {comparison && (
-          <View style={styles.temporalComparisonCard}>
-          <View style={styles.temporalComparisonTitleRow}>
-          <Ionicons name="git-compare-outline" size={16} color={C.teal} />
-          <Text style={styles.temporalComparisonTitle}>Period comparison</Text>
+            {comparison && (
+              <View style={styles.temporalComparisonCard}>
+                <View style={styles.temporalComparisonTitleRow}>
+                  <Ionicons name="git-compare-outline" size={16} color={C.teal} />
+                  <Text style={styles.temporalComparisonTitle}>Period comparison</Text>
+                </View>
+                <Text style={styles.temporalComparisonText}>
+                  Previous average {previousAverage.toFixed(3)} · Current average {currentAverage.toFixed(3)}
+                </Text>
+              </View>
+            )}
+
+            {alertIndexes.size > 0 && (
+              <View style={styles.temporalAlertCard}>
+                <View style={styles.temporalAlertIcon}>
+                  <Ionicons name="notifications-outline" size={18} color={C.danger} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.temporalAlertTitle}>Unusual pollution events detected</Text>
+                  <Text style={styles.temporalAlertText}>
+                    {alertIndexes.size} significant spike{alertIndexes.size === 1 ? "" : "s"} exceeded the statistical alert threshold.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
-          <Text style={styles.temporalComparisonText}>
-          Previous average {previousAverage.toFixed(3)} · Current average {currentAverage.toFixed(3)}
-          </Text>
+
+          <View style={styles.temporalChartArea}>
+            <View style={styles.temporalChartTopRow}>
+              <View>
+                <Text style={styles.temporalChartTitle}>Temporal Pollution Trend Analysis</Text>
+                <Text style={styles.temporalChartSubtitle}>
+                  {trendData.length} {granularity === "hour" ? "hourly" : granularity === "day" ? "daily" : granularity === "month" ? "monthly" : "yearly"} periods · concentration level
+                </Text>
+              </View>
+              {hovered && trendData[hovered.index] && (
+                <View style={styles.temporalTooltip}>
+                  <Text style={styles.temporalTooltipTitle}>{hovered.metal}</Text>
+                  <Text style={styles.temporalTooltipValue}>
+                    {trendData[hovered.index].values[hovered.metal]?.toFixed(4) ?? "N/A"}
+                  </Text>
+                  <Text style={styles.temporalTooltipDate}>{trendData[hovered.index].label}</Text>
+                </View>
+              )}
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.temporalChartScroll}>
+              <Svg width={chartWidth} height={chartHeight}>
+                {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+                  const y = padding.top + innerHeight * ratio;
+                  const value = yMax - (yMax - yMin) * ratio;
+                  return (
+                    <React.Fragment key={`grid-${ratio}`}>
+                      <Line x1={padding.left} y1={y} x2={chartWidth - padding.right} y2={y} stroke={C.border} strokeWidth="1" />
+                      <SvgText x={padding.left - 8} y={y + 3} fill={C.muted} fontSize="8" textAnchor="end">{value.toFixed(2)}</SvgText>
+                    </React.Fragment>
+                  );
+                })}
+
+                {comparison && visibleMetals.map((metal) => {
+                  const periodValues = previousPoints
+                    .map((point) => point.values[metal])
+                    .filter((value) => Number.isFinite(value));
+                  if (!periodValues.length) return null;
+                  const avg = periodValues.reduce((sum, value) => sum + value, 0) / periodValues.length;
+                  const y = pointXY(0, avg).y;
+                  return (
+                    <Line
+                      key={`previous-${metal}`}
+                      x1={padding.left}
+                      y1={y}
+                      x2={chartWidth - padding.right}
+                      y2={y}
+                      stroke={palette[metal]}
+                      strokeWidth="1"
+                      strokeDasharray="5 5"
+                      opacity={0.35}
+                    />
+                  );
+                })}
+
+                {visibleMetals.map((metal) => (
+                  <Path
+                    key={metal}
+                    d={makePath(metal)}
+                    fill="none"
+                    stroke={palette[metal]}
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                ))}
+
+                {visibleMetals.flatMap((metal) =>
+                  trendData.map((point, index) => {
+                    const value = point.values[metal];
+                    if (!Number.isFinite(value)) return null;
+                    const xy = pointXY(index, value);
+                    return (
+                      <Circle
+                        key={`metal-{index}`}
+                        cx={xy.x}
+                        cy={xy.y}
+                        r={alertIndexes.has(index) ? 6 : 4}
+                        fill={alertIndexes.has(index) ? C.danger : palette[metal]}
+                        stroke={C.surface}
+                        strokeWidth="2"
+                        onPress={() => setHovered({ metal, index })}
+                      />
+                    );
+                  }),
+                )}
+
+                {trendData.map((point, index) => {
+                  if (index !== 0 && index !== trendData.length - 1 && index % Math.max(1, Math.ceil(trendData.length / 6)) !== 0) return null;
+                  const xy = pointXY(index, yMin);
+                  return (
+                    <SvgText key={`x-${index}`} x={xy.x} y={chartHeight - 12} fill={C.muted} fontSize="8" textAnchor="middle">
+                      {formatLabel(point.label)}
+                    </SvgText>
+                  );
+                })}
+              </Svg>
+            </ScrollView>
+
+            <View style={styles.temporalAxisNote}>
+              <Text style={styles.temporalAxisText}>Time →</Text>
+              <View style={styles.temporalAxisRight}>
+                <Ionicons name="hand-left-outline" size={13} color={C.muted} />
+                <Text style={styles.temporalAxisText}>Scroll to pan · + / − to zoom · tap a point for exact value</Text>
+              </View>
+            </View>
           </View>
-        )}
-
-        {alertIndexes.size > 0 && (
-          <View style={styles.temporalAlertCard}>
-          <View style={styles.temporalAlertIcon}>
-          <Ionicons name="notifications-outline" size={18} color={C.danger} />
-          </View>
-          <View style={{ flex: 1 }}>
-          <Text style={styles.temporalAlertTitle}>Unusual pollution events detected</Text>
-          <Text style={styles.temporalAlertText}>
-          {alertIndexes.size} significant spike{alertIndexes.size === 1 ? "" : "s"} exceeded the statistical alert threshold.
-          </Text>
-          </View>
-          </View>
-        )}
-        </View>
-
-        <View style={styles.temporalChartArea}>
-        <View style={styles.temporalChartTopRow}>
-        <View>
-        <Text style={styles.temporalChartTitle}>Temporal Pollution Trend Analysis</Text>
-        <Text style={styles.temporalChartSubtitle}>
-        {trendData.length} {granularity === "hour" ? "hourly" : granularity === "day" ? "daily" : granularity === "month" ? "monthly" : "yearly"} periods · concentration level
-        </Text>
-        </View>
-        {hovered && trendData[hovered.index] && (
-          <View style={styles.temporalTooltip}>
-          <Text style={styles.temporalTooltipTitle}>{hovered.metal}</Text>
-          <Text style={styles.temporalTooltipValue}>
-          {trendData[hovered.index].values[hovered.metal]?.toFixed(4) ?? "N/A"}
-          </Text>
-          <Text style={styles.temporalTooltipDate}>{trendData[hovered.index].label}</Text>
-          </View>
-        )}
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.temporalChartScroll}>
-        <Svg width={chartWidth} height={chartHeight}>
-        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-          const y = padding.top + innerHeight * ratio;
-          const value = yMax - (yMax - yMin) * ratio;
-          return (
-            <React.Fragment key={`grid-${ratio}`}>
-            <Line x1={padding.left} y1={y} x2={chartWidth - padding.right} y2={y} stroke={C.border} strokeWidth="1" />
-            <SvgText x={padding.left - 8} y={y + 3} fill={C.muted} fontSize="8" textAnchor="end">{value.toFixed(2)}</SvgText>
-            </React.Fragment>
-          );
-        })}
-
-        {comparison && visibleMetals.map((metal) => {
-          const periodValues = previousPoints
-          .map((point) => point.values[metal])
-          .filter((value) => Number.isFinite(value));
-          if (!periodValues.length) return null;
-          const avg = periodValues.reduce((sum, value) => sum + value, 0) / periodValues.length;
-          const y = pointXY(0, avg).y;
-          return (
-            <Line
-            key={`previous-${metal}`}
-            x1={padding.left}
-            y1={y}
-            x2={chartWidth - padding.right}
-            y2={y}
-            stroke={palette[metal]}
-            strokeWidth="1"
-            strokeDasharray="5 5"
-            opacity={0.35}
-            />
-          );
-        })}
-
-        {visibleMetals.map((metal) => (
-          <Path
-          key={metal}
-          d={makePath(metal)}
-          fill="none"
-          stroke={palette[metal]}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          />
-        ))}
-
-        {visibleMetals.flatMap((metal) =>
-          trendData.map((point, index) => {
-            const value = point.values[metal];
-            if (!Number.isFinite(value)) return null;
-            const xy = pointXY(index, value);
-            return (
-              <Circle
-              key={`metal-{index}`}
-              cx={xy.x}
-              cy={xy.y}
-              r={alertIndexes.has(index) ? 6 : 4}
-              fill={alertIndexes.has(index) ? C.danger : palette[metal]}
-              stroke={C.surface}
-              strokeWidth="2"
-              onPress={() => setHovered({ metal, index })}
-              />
-            );
-          }),
-        )}
-
-        {trendData.map((point, index) => {
-          if (index !== 0 && index !== trendData.length - 1 && index % Math.max(1, Math.ceil(trendData.length / 6)) !== 0) return null;
-          const xy = pointXY(index, yMin);
-          return (
-            <SvgText key={`x-${index}`} x={xy.x} y={chartHeight - 12} fill={C.muted} fontSize="8" textAnchor="middle">
-            {formatLabel(point.label)}
-            </SvgText>
-          );
-        })}
-        </Svg>
-        </ScrollView>
-
-        <View style={styles.temporalAxisNote}>
-        <Text style={styles.temporalAxisText}>Time →</Text>
-        <View style={styles.temporalAxisRight}>
-        <Ionicons name="hand-left-outline" size={13} color={C.muted} />
-        <Text style={styles.temporalAxisText}>Scroll to pan · + / − to zoom · tap a point for exact value</Text>
-        </View>
-        </View>
-        </View>
         </View>
       )}
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
-  /* ============================================================
-   *   S TYLES      *
-   *   ============================================================ */
+/* ============================================================
+ *   S TYLES      *
+ *   ============================================================ */
 
-  function createStyles() {
-    return StyleSheet.create({
-      center: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: C.bg,
-      },
+function createStyles() {
+  return StyleSheet.create({
+    center: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: C.bg,
+    },
 
-      googleMap: {
-        width: "100%",
-        height: 520,
-        borderRadius: 16,
-        overflow: "hidden",
-      },
+    googleMap: {
+      width: "100%",
+      height: 520,
+      borderRadius: 16,
+      overflow: "hidden",
+    },
 
-      mapFallback: {
-        minHeight: 280,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.mint2,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 28,
-      },
+    mapFallback: {
+      minHeight: 280,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.mint2,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 28,
+    },
 
-      mapFallbackTitle: {
-        marginTop: 10,
-        fontSize: 17,
-        fontWeight: "700",
-        color: C.text,
-      },
+    mapFallbackTitle: {
+      marginTop: 10,
+      fontSize: 17,
+      fontWeight: "700",
+      color: C.text,
+    },
 
-      mapFallbackText: {
-        marginTop: 8,
-        maxWidth: 430,
-        textAlign: "center",
-        lineHeight: 20,
-        color: C.muted,
-      },
+    mapFallbackText: {
+      marginTop: 8,
+      maxWidth: 430,
+      textAlign: "center",
+      lineHeight: 20,
+      color: C.muted,
+    },
 
-      legendRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 20,
-      },
+    legendRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 20,
+    },
 
-      legendItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 7,
-      },
+    legendItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+    },
 
-      legendDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-      },
+    legendDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
 
-      legendText: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: C.text,
-      },
+    legendText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: C.text,
+    },
 
-      authWrap: {
-        flex: 1,
-        backgroundColor: C.bg,
-      },
+    authWrap: {
+      flex: 1,
+      backgroundColor: C.bg,
+    },
 
-      authScroll: {
-        minHeight:
+    authScroll: {
+      minHeight:
         Dimensions.get(
           "window",
         ).height,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-      },
-
-      brand: {
-        alignItems: "center",
-        marginBottom: 34,
-      },
-
-      logo: {
-        width: 52,
-        height: 52,
-        borderRadius: 14,
-        backgroundColor: C.teal,
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 12,
-      },
-
-      brandName: {
-        fontSize: 27,
-        fontWeight: "800",
-        color: C.text,
-      },
-
-      tagline: {
-        marginTop: 4,
-        color: C.muted,
-        fontSize: 15,
-      },
-
-      authCard: {
-        width: "100%",
-        maxWidth: 440,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 18,
-        padding: 28,
-      },
-
-      eyebrow: {
-        color: C.teal,
-        fontSize: 13,
-        letterSpacing: 2,
-        fontWeight: "800",
-        marginBottom: 10,
-      },
-
-      h1: {
-        color: C.text,
-        fontSize: 30,
-        fontWeight: "800",
-        marginBottom: 10,
-      },
-
-      sub: {
-        color: C.muted,
-        fontSize: 15,
-        lineHeight: 23,
-        marginBottom: 25,
-      },
-
-      fieldWrap: {
-        marginBottom: 16,
-      },
-
-      fieldLabel: {
-        color: C.muted,
-        fontSize: 13,
-        letterSpacing: 1.4,
-        fontWeight: "800",
-        marginBottom: 8,
-      },
-
-      input: {
-        height: 48,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 10,
-        paddingHorizontal: 14,
-        color: C.text,
-        backgroundColor: C.surface,
-        fontSize: 15,
-      },
-
-      passwordBox: {
-        height: 48,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 10,
-        paddingLeft: 14,
-        paddingRight: 13,
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 16,
-      },
-
-      passwordInput: {
-        flex: 1,
-        color: C.text,
-        fontSize: 15,
-      },
-
-      authError: {
-        color: C.danger,
-        fontSize: 15,
-        marginBottom: 14,
-      },
-
-      primaryButton: {
-        height: 48,
-        borderRadius: 10,
-        backgroundColor: C.green,
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "row",
-        gap: 8,
-        marginTop: 2,
-      },
-
-      primaryButtonText: {
-        color: C.white,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      authSwitch: {
-        color: C.teal,
-        textAlign: "center",
-        fontWeight: "800",
-        fontSize: 15,
-        marginTop: 19,
-      },
-
-      shell: {
-        flex: 1,
-        flexDirection: "row",
-        backgroundColor: C.bg,
-      },
-
-      sidebar: {
-        width: 375,
-        backgroundColor: C.sidebar,
-        borderRightWidth: 1,
-        borderRightColor: C.border,
-        paddingHorizontal: 17,
-        paddingTop: 22,
-        paddingBottom: 17,
-      },
-
-      sidebarMobile: {
-        position: "absolute",
-        zIndex: 100,
-        left: 0,
-        top: 0,
-        bottom: 0,
-        elevation: 20,
-      },
-
-      sidebarBrand: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 5,
-        marginBottom: 43,
-      },
-
-      sidebarLogo: {
-        width: 51,
-        height: 51,
-        marginRight: 14,
-        resizeMode: "contain",
-      },
-      sidebarBrandText: {
-        color: C.text,
-        fontSize: 20,
-        fontWeight: "800",
-      },
-
-      workspaceLabel: {
-        color: C.muted,
-        fontSize: 12,
-        fontWeight: "800",
-        letterSpacing: 1.5,
-        marginHorizontal: 5,
-        marginBottom: 14,
-      },
-
-      navList: {
-        gap: 5,
-      },
-
-      navItem: {
-        minHeight: 68,
-        borderRadius: 15,
-        paddingHorizontal: 15,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 20,
-      },
-
-      navItemActive: {
-        backgroundColor: C.mint,
-        borderWidth: 2,
-        borderColor: C.border,
-      },
-
-      navText: {
-        color: C.muted,
-        fontSize: 20,
-        fontWeight: "500",
-      },
-
-      navTextActive: {
-        color: C.greenDark,
-        fontWeight: "800",
-      },
-
-      sidebarBottom: {
-        marginTop: "auto",
-      },
-
-      sidebarDivider: {
-        height: 1,
-        backgroundColor: C.border,
-        marginBottom: 15,
-      },
-
-      userMini: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 9,
-      },
-
-      avatarSmall: {
-        width: 36,
-        height: 36,
-        borderRadius: 11,
-        backgroundColor: C.mint,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      avatarLetter: {
-        color: C.green,
-        fontWeight: "800",
-        fontSize: 16,
-      },
-
-      userMiniName: {
-        color: C.text,
-        fontWeight: "800",
-        fontSize: 14.5,
-      },
-
-      userMiniRole: {
-        color: C.muted,
-        fontSize: 13,
-        marginTop: 2,
-      },
-
-      main: {
-        flex: 1,
-        minWidth: 0,
-      },
-
-      topbar: {
-        height: 74,
-        backgroundColor: C.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: C.border,
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 38,
-      },
-
-      mobileMenu: {
-        display: "none",
-        marginRight: 14,
-      },
-
-      topbarTitle: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 18,
-      },
-
-      topTitle: {
-        color: C.text,
-        fontSize: 19,
-        fontWeight: "800",
-      },
-
-      topSubtitle: {
-        color: C.muted,
-        fontSize: 14,
-        marginTop: 2,
-      },
-
-      topAvatar: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
-        backgroundColor: C.mint,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      topAvatarText: {
-        color: C.green,
-        fontWeight: "800",
-      },
-
-      content: {
-        flex: 1,
-        backgroundColor: C.bg,
-      },
-
-      contentInner: {
-        paddingHorizontal: 30,
-        paddingVertical: 29,
-        maxWidth: 1350,
-        width: "100%",
-        alignSelf: "center",
-      },
-
-      pageIntro: {
-        marginBottom: 28,
-      },
-
-      pageEyebrow: {
-        color: C.teal,
-        fontSize: 13,
-        letterSpacing: 2,
-        fontWeight: "800",
-        marginBottom: 7,
-      },
-
-      pageTitle: {
-        color: C.text,
-        fontSize: 31,
-        lineHeight: 38,
-        fontWeight: "800",
-        marginBottom: 9,
-      },
-
-      pageDescription: {
-        color: C.muted,
-        fontSize: 15,
-        lineHeight: 23,
-        maxWidth: 820,
-      },
-
-      heroCard: {
-        minHeight: 150,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 16,
-        padding: 18,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 20,
-        marginBottom: 10,
-      },
-
-      heroEyebrow: {
-        color: C.teal,
-        fontSize: 15,
-        letterSpacing: 2,
-        fontWeight: "800",
-        marginBottom: 6,
-      },
-
-      heroTitle: {
-        color: C.text,
-        fontSize: 27,
-        lineHeight: 32,
-        fontWeight: "800",
-        maxWidth: 650,
-      },
-
-      heroText: {
-        color: C.muted,
-        fontSize: 15,
-        lineHeight: 17,
-        marginTop: 6,
-        maxWidth: 540,
-      },
-
-      importButton: {
-        backgroundColor: C.green,
-        borderRadius: 9,
-        height: 39,
-        paddingHorizontal: 18,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-      },
-
-      importButtonText: {
-        color: C.white,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      analysisHeader: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 24,
-        marginBottom: 28,
-        position: "relative",
-        zIndex: 100,
-      },
-
-      analysisHeaderText: {
-        flex: 1,
-        minWidth: 0,
-      },
-
-      statRow: {
-        flexDirection: "row",
-        gap: 10,
-        marginBottom: 10,
-      },
-
-      sampleSelectorPanel: {
-        width: 360,
-        maxWidth: "42%",
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 0,
-        position: "relative",
-        zIndex: 200,
-      },
-
-      sampleSelectorHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 7,
-      },
-
-      sampleSelectorTitle: {
-        color: C.teal,
-        fontSize: 15,
-        fontWeight: "800",
-        letterSpacing: 0.7,
-        textTransform: "uppercase",
-      },
-
-      sampleSelectorSubtitle: {
-        color: C.muted,
-        fontSize: 15,
-        marginTop: 3,
-      },
-
-      sampleSelectorButton: {
-        minHeight: 48,
-        borderWidth: 1,
-        borderColor: C.teal,
-        borderRadius: 8,
-        paddingHorizontal: 13,
-        paddingVertical: 7,
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: C.bg,
-      },
-
-      sampleSelectorValue: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      sampleSelectorMeta: {
-        color: C.muted,
-        fontSize: 14,
-        marginTop: 2,
-      },
-
-      sampleDropdown: {
-        position: "absolute",
-        left: 12,
-        right: 12,
-        top: 78,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.teal,
-        borderRadius: 8,
-        zIndex: 100,
-        elevation: 12,
-        shadowColor: "#000000",
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 4 },
-      },
-
-      sampleDropdownScroll: {
-        maxHeight: 320,
-      },
-
-      sampleDropdownOption: {
-        minHeight: 54,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 9,
-        borderBottomWidth: 1,
-        borderBottomColor: C.border,
-      },
-
-      sampleDropdownOptionActive: {
-        backgroundColor: C.mint2,
-      },
-
-      sampleDropdownName: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      sampleDropdownMeta: {
-        color: C.muted,
-        fontSize: 14,
-        marginTop: 2,
-      },
-
-      sampleDropdownMetrics: {
-        alignItems: "flex-end",
-        marginRight: 6,
-      },
-
-      sampleDropdownMetric: {
-        color: C.muted,
-        fontSize: 13,
-        lineHeight: 13,
-      },
-
-      gaugeRow: {
-        flexDirection: "row",
-        gap: 15,
-        marginBottom: 15,
-      },
-
-      gaugeCard: {
-        flex: 1,
-        height: 177,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 9,
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        position: "relative",
-      },
-
-      gaugeValueContainer: {
-        position: "absolute",
-        top: 88,
-        left: 0,
-        right: 0,
-        alignItems: "center",
-      },
-
-      gaugeValue: {
-        color: C.text,
-        fontSize: 20,
-        lineHeight: 24,
-        fontWeight: "900",
-      },
-
-      gaugeStatus: {
-        fontSize: 13,
-        lineHeight: 13,
-        fontWeight: "800",
-        marginTop: 2,
-      },
-
-      gaugeLabel: {
-        color: C.muted,
-        fontSize: 14,
-        lineHeight: 14,
-        marginTop: 1,
-      },
-
-      statCard: {
-        flex: 1,
-        minHeight: 150,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 15,
-        padding: 24,
-      },
-
-      statValue: {
-        color: C.text,
-        fontSize: 32,
-        fontWeight: "800",
-        marginTop: 12,
-      },
-
-      metricValue: {
-        color: C.text,
-        fontSize: 27,
-        fontWeight: "800",
-        marginTop: 9,
-      },
-
-      statLabel: {
-        color: C.muted,
-        fontSize: 15,
-        marginTop: 2,
-      },
-
-      singleStat: {
-        minHeight: 135,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 15,
-        padding: 24,
-        marginBottom: 15,
-      },
-
-      bigStat: {
-        color: C.text,
-        fontSize: 32,
-        fontWeight: "800",
-        marginTop: 12,
-      },
-
-      temporalPanel: {
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 18,
-        padding: 24,
-        marginBottom: 15,
-        shadowColor: "#000000",
-        shadowOpacity: 0.06,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 2,
-      },
-
-      temporalHeader: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 14,
-        marginBottom: 16,
-      },
-
-      temporalHeaderText: {
-        flex: 1,
-        minWidth: 0,
-      },
-
-      temporalHeaderBadge: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.mint2,
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-      },
-
-      temporalHeaderBadgeText: {
-        color: C.text,
-        fontSize: 13,
-        fontWeight: "800",
-      },
-
-      temporalControls: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 12,
-        marginBottom: 13,
-      },
-
-      temporalControlGroup: {
-        flexDirection: "row",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: 7,
-      },
-
-      temporalControlLabel: {
-        color: C.muted,
-        fontSize: 11,
-        fontWeight: "800",
-        letterSpacing: 1,
-        marginRight: 2,
-      },
-
-      temporalFilter: {
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        backgroundColor: C.surface,
-      },
-
-      temporalFilterActive: {
-        backgroundColor: C.mint,
-        borderColor: C.teal,
-      },
-
-      temporalFilterText: {
-        color: C.muted,
-        fontSize: 12,
-        fontWeight: "700",
-      },
-
-      temporalFilterTextActive: {
-        color: C.teal,
-      },
-
-      temporalAction: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        backgroundColor: C.surface,
-      },
-
-      temporalActionActive: {
-        backgroundColor: C.teal,
-        borderColor: C.teal,
-      },
-
-      temporalActionText: {
-        color: C.teal,
-        fontSize: 12,
-        fontWeight: "800",
-      },
-
-      temporalActionTextActive: {
-        color: C.white,
-      },
-
-      temporalIconButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.surface,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      temporalLegendWrap: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 8,
-        marginBottom: 16,
-      },
-
-      temporalLegendItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 5,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 999,
-        paddingHorizontal: 9,
-        paddingVertical: 5,
-        backgroundColor: C.surface,
-      },
-
-      temporalLegendItemMuted: {
-        opacity: 0.35,
-      },
-
-      temporalLegendDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-      },
-
-      temporalLegendText: {
-        color: C.text,
-        fontSize: 12,
-        fontWeight: "800",
-      },
-
-      temporalBody: {
-        flexDirection: "row",
-        alignItems: "stretch",
-        gap: 18,
-      },
-
-      temporalBodyCompact: {
-        flexDirection: "column",
-      },
-
-      temporalMetrics: {
-        width: 245,
-        minWidth: 210,
-        gap: 10,
-      },
-
-      temporalMetricsCompact: {
-        width: "100%",
-        minWidth: 0,
-      },
-
-      temporalMetricCard: {
-        backgroundColor: C.mint2,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 11,
-        padding: 13,
-        minHeight: 78,
-      },
-
-      temporalMetricLabel: {
-        color: C.muted,
-        fontSize: 11,
-        fontWeight: "800",
-        letterSpacing: 1,
-      },
-
-      temporalMetricValue: {
-        color: C.text,
-        fontSize: 22,
-        fontWeight: "900",
-        marginTop: 5,
-      },
-
-      temporalMetricValueSmall: {
-        color: C.text,
-        fontSize: 16,
-        fontWeight: "900",
-        marginLeft: 6,
-      },
-
-      temporalMetricHint: {
-        color: C.muted,
-        fontSize: 11,
-        marginTop: 2,
-      },
-
-      temporalTrendValueRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginTop: 5,
-      },
-
-      temporalComparisonCard: {
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 11,
-        padding: 12,
-        backgroundColor: C.surface,
-      },
-
-      temporalComparisonTitleRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-      },
-
-      temporalComparisonTitle: {
-        color: C.text,
-        fontSize: 12,
-        fontWeight: "800",
-      },
-
-      temporalComparisonText: {
-        color: C.muted,
-        fontSize: 11,
-        lineHeight: 14,
-        marginTop: 5,
-      },
-
-      temporalAlertCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 9,
-        borderWidth: 1,
-        borderColor: C.danger,
-        borderRadius: 11,
-        padding: 11,
-        backgroundColor: C.surface,
-      },
-
-      temporalAlertIcon: {
-        width: 31,
-        height: 31,
-        borderRadius: 10,
-        backgroundColor: C.mint2,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      temporalAlertTitle: {
-        color: C.text,
-        fontSize: 12,
-        fontWeight: "800",
-      },
-
-      temporalAlertText: {
-        color: C.muted,
-        fontSize: 11,
-        lineHeight: 13,
-        marginTop: 2,
-      },
-
-      temporalChartArea: {
-        flex: 1,
-        minWidth: 0,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 13,
-        padding: 14,
-        backgroundColor: C.surface,
-        overflow: "hidden",
-      },
-
-      temporalChartTopRow: {
-        minHeight: 52,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "flex-start",
-        gap: 10,
-      },
-
-      temporalChartTitle: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      temporalChartSubtitle: {
-        color: C.muted,
-        fontSize: 11,
-        marginTop: 3,
-      },
-
-      temporalTooltip: {
-        minWidth: 115,
-        borderWidth: 1,
-        borderColor: C.teal,
-        borderRadius: 9,
-        paddingHorizontal: 9,
-        paddingVertical: 7,
-        backgroundColor: C.mint2,
-      },
-
-      temporalTooltipTitle: {
-        color: C.text,
-        fontSize: 12,
-        fontWeight: "800",
-      },
-
-      temporalTooltipValue: {
-        color: C.teal,
-        fontSize: 15,
-        fontWeight: "900",
-        marginTop: 2,
-      },
-
-      temporalTooltipDate: {
-        color: C.muted,
-        fontSize: 10,
-        marginTop: 1,
-      },
-
-      temporalChartScroll: {
-        width: "100%",
-      },
-
-      temporalAxisNote: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 10,
-        marginTop: 2,
-      },
-
-      temporalAxisRight: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-      },
-
-      temporalAxisText: {
-        color: C.muted,
-        fontSize: 10,
-      },
-
-      temporalEmpty: {
-        minHeight: 250,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 13,
-        backgroundColor: C.mint2,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 28,
-      },
-
-      temporalEmptyTitle: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-        marginTop: 10,
-      },
-
-      temporalEmptyText: {
-        color: C.muted,
-        fontSize: 13,
-        lineHeight: 18,
-        textAlign: "center",
-        maxWidth: 500,
-        marginTop: 5,
-      },
-
-      panel: {
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 15,
-        padding: 24,
-        marginBottom: 15,
-      },
-
-      panelTitle: {
-        color: C.text,
-        fontSize: 17,
-        fontWeight: "800",
-      },
-
-      panelSubtitle: {
-        color: C.muted2,
-        fontSize: 15,
-        marginTop: 3,
-        marginBottom: 13,
-      },
-
-      sampleRow: {
-        minHeight: 58,
-        borderBottomWidth: 1,
-        borderBottomColor: C.border,
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 10,
-        gap: 10,
-      },
-
-      statusDot: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-      },
-
-      sampleTitle: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      sampleMeta: {
-        color: C.muted,
-        fontSize: 13,
-        marginTop: 2,
-      },
-
-      sampleRight: {
-        alignItems: "flex-end",
-        minWidth: 115,
-      },
-
-      sampleHpi: {
-        color: C.text,
-        fontSize: 14,
-        fontWeight: "800",
-      },
-
-      sampleHei: {
-        color: C.muted,
-        fontSize: 12,
-        marginTop: 3,
-      },
-
-      templatePanel: {
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 15,
-        padding: 24,
-        marginBottom: 15,
-        shadowColor: "#000000",
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 2,
-      },
-
-      templateHeaderRow: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 16,
-      },
-
-      templateFieldCount: {
-        minWidth: 86,
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-        borderRadius: 11,
-        backgroundColor: C.mint2,
-        alignItems: "center",
-      },
-
-      templateFieldCountValue: {
-        color: C.teal,
-        fontSize: 20,
-        fontWeight: "900",
-      },
-
-      templateFieldCountLabel: {
-        color: C.muted,
-        fontSize: 10,
-        fontWeight: "900",
-        letterSpacing: 0.8,
-        marginTop: 2,
-      },
-
-      templateContent: {
-        flexDirection: "row",
-        gap: 22,
-        marginTop: 8,
-      },
-
-      templateInfoSection: {
-        flex: 1.65,
-        minWidth: 0,
-      },
-
-      templateContentNarrow: {
-        flexDirection: "column",
-      },
-
-      templateDownloadSection: {
-        flex: 0.9,
-        minWidth: 270,
-        padding: 12,
-        borderRadius: 13,
-        backgroundColor: C.mint2,
-        borderWidth: 1,
-        borderColor: C.border,
-      },
-
-      templateDownloadRow: {
-        flexDirection: "row",
-        gap: 10,
-      },
-
-      templateDownloadSectionNarrow: {
-        minWidth: 0,
-        width: "100%",
-      },
-
-      templateInfoRow: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 10,
-        paddingVertical: 8,
-      },
-
-      templateInfoTitle: {
-        color: C.text,
-        fontSize: 14,
-        fontWeight: "800",
-      },
-
-      templateInfoText: {
-        color: C.muted,
-        fontSize: 12.5,
-        lineHeight: 16,
-        marginTop: 2,
-      },
-
-      templateValidationBox: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 10,
-        padding: 11,
-        marginTop: 7,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.surface,
-      },
-
-      templateGuideHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        marginTop: 13,
-        marginBottom: 8,
-      },
-
-      templateGuideTitle: {
-        color: C.text,
-        fontSize: 14,
-        fontWeight: "800",
-      },
-
-      templateCopyButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 5,
-        paddingHorizontal: 9,
-        paddingVertical: 6,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.surface,
-      },
-
-      templateCopyText: {
-        color: C.teal,
-        fontSize: 12,
-        fontWeight: "800",
-      },
-
-      templateFieldGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 7,
-      },
-
-      templateFieldItem: {
-        flexBasis: "48%",
-        minWidth: 210,
-        minHeight: 34,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 5,
-        paddingHorizontal: 8,
-        paddingVertical: 6,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.surface,
-      },
-
-      templateFieldName: {
-        color: C.text,
-        fontSize: 11.5,
-        fontWeight: "700",
-      },
-
-      templateTooltipText: {
-        color: C.muted,
-        fontSize: 11,
-        lineHeight: 13,
-        marginTop: 3,
-      },
-
-      templateDownloadTitle: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      templateDownloadText: {
-        color: C.muted,
-        fontSize: 12.5,
-        lineHeight: 15,
-        marginTop: 4,
-        marginBottom: 12,
-      },
-
-      templateDownloadButton: {
-        flex: 1,
-        minWidth: 0,
-        minHeight: 60,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        padding: 9,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.surface,
-        marginBottom: 0,
-      },
-
-      templateDownloadIcon: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        backgroundColor: C.mint2,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      templateDownloadButtonTitle: {
-        color: C.text,
-        fontSize: 13.5,
-        fontWeight: "800",
-      },
-
-      templateDownloadButtonText: {
-        color: C.muted,
-        fontSize: 11.5,
-        marginTop: 3,
-      },
-
-      templatePreviewButton: {
-        minHeight: 43,
-        borderRadius: 9,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.surface,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 7,
-        marginTop: 3,
-      },
-
-      templatePreviewText: {
-        color: C.text,
-        fontSize: 13,
-        fontWeight: "800",
-      },
-
-      templateStatus: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        marginTop: 10,
-      },
-
-      templateStatusText: {
-        flex: 1,
-        color: C.greenDark,
-        fontSize: 11.5,
-        fontWeight: "700",
-      },
-
-      templateModalBackdrop: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.45)",
-                             alignItems: "center",
-                             justifyContent: "center",
-                             padding: 20,
-      },
-
-      templateModal: {
-        width: "100%",
-        maxWidth: 1180,
-        maxHeight: "85%",
-        backgroundColor: C.surface,
-        borderRadius: 16,
-        padding: 20,
-        borderWidth: 1,
-        borderColor: C.border,
-      },
-
-      templateModalHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-      },
-
-      templateModalTitle: {
-        color: C.text,
-        fontSize: 18,
-        fontWeight: "800",
-      },
-
-      templateModalSubtitle: {
-        color: C.muted,
-        fontSize: 12.5,
-        marginTop: 3,
-      },
-
-      templatePreviewRow: {
-        flexDirection: "row",
-        borderBottomWidth: 1,
-        borderBottomColor: C.border,
-      },
-
-      templatePreviewHeader: {
-        backgroundColor: C.mint2,
-        borderTopLeftRadius: 8,
-        borderTopRightRadius: 8,
-      },
-
-      templatePreviewCell: {
-        width: 150,
-        color: C.text,
-        fontSize: 11,
-        paddingHorizontal: 8,
-        paddingVertical: 9,
-        borderRightWidth: 1,
-        borderRightColor: C.border,
-      },
-
-      templatePreviewHeaderText: {
-        color: C.muted,
-        fontWeight: "900",
-        fontSize: 10.5,
-      },
-
-      metadataGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 12,
-      },
-
-      metadataGridField: {
-        flexBasis: "48%",
-        minWidth: 260,
-      },
-
-      checkRow: {
-        minHeight: 70,
-        borderBottomWidth: 1,
-        borderBottomColor: C.border,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        paddingVertical: 10,
-      },
-
-      checkIcon: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      checkTitle: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      checkMeta: {
-        color: C.muted,
-        fontSize: 12.5,
-        marginTop: 3,
-      },
-
-      checkBadge: {
-        minWidth: 68,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 999,
-        alignItems: "center",
-      },
-
-      checkBadgeText: {
-        fontSize: 11,
-        fontWeight: "900",
-        letterSpacing: 0.8,
-      },
-
-      sectionHeadingRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 10,
-        marginTop: 4,
-      },
-
-      sectionHeading: {
-        color: C.muted,
-        fontSize: 13,
-        letterSpacing: 1.7,
-        fontWeight: "800",
-      },
-
-      decisionCard: {
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 15,
-        padding: 17,
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 14,
-        marginBottom: 10,
-      },
-
-      decisionIcon: {
-        width: 42,
-        height: 42,
-        borderRadius: 11,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      decisionTitle: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      decisionText: {
-        color: C.muted,
-        fontSize: 15,
-        lineHeight: 20,
-        marginTop: 5,
-      },
-
-      resultsTable: {
-        minWidth: 1100,
-      },
-
-      resultTableRow: {
-        minHeight: 56,
-        flexDirection: "row",
-        alignItems: "center",
-        borderBottomWidth: 1,
-        borderBottomColor: C.border,
-        paddingVertical: 8,
-      },
-
-      resultTableHeader: {
-        backgroundColor: C.mint2,
-        borderRadius: 8,
-      },
-
-      resultTableCell: {
-        width: 145,
-        color: C.text,
-        fontSize: 12.5,
-        paddingHorizontal: 9,
-      },
-
-      resultTableId: {
-        width: 85,
-        fontWeight: "800",
-      },
-
-      resultTableHeaderText: {
-        color: C.muted,
-        fontSize: 11,
-        fontWeight: "900",
-        letterSpacing: 0.7,
-        textTransform: "uppercase",
-      },
-
-      resultStatus: {
-        width: 105,
-        marginHorizontal: 5,
-        paddingVertical: 6,
-        borderRadius: 999,
-        alignItems: "center",
-      },
-
-      resultStatusText: {
-        fontSize: 11,
-        fontWeight: "900",
-      },
-
-      qualityHero: {
-        backgroundColor: C.mint,
-        borderRadius: 15,
-        padding: 25,
-        marginBottom: 20,
-      },
-
-      qualityEyebrow: {
-        color: C.teal,
-        fontSize: 13,
-        fontWeight: "800",
-        letterSpacing: 1.6,
-      },
-
-      qualityScoreLine: {
-        flexDirection: "row",
-        alignItems: "baseline",
-        marginTop: 8,
-      },
-
-      qualityScore: {
-        color: C.green,
-        fontSize: 48,
-        lineHeight: 55,
-        fontWeight: "800",
-      },
-
-      qualityOutOf: {
-        color: C.muted,
-        fontSize: 18,
-        fontWeight: "700",
-        marginLeft: 8,
-      },
-
-      qualityGrade: {
-        color: C.text,
-        fontSize: 15,
-        marginTop: 2,
-      },
-
-      importLockedBanner: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        marginTop: 14,
-        padding: 13,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: C.warning,
-        backgroundColor: C.mint2,
-      },
-
-      importLockedIcon: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: C.mint,
-      },
-
-      importLockedTitle: {
-        color: C.text,
-        fontSize: 14,
-        fontWeight: "800",
-      },
-
-      importLockedText: {
-        color: C.muted,
-        fontSize: 13,
-        lineHeight: 16,
-        marginTop: 2,
-      },
-
-      importReadyBanner: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-        marginTop: 14,
-        padding: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.mint2,
-      },
-
-      importReadyIcon: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: C.mint2,
-      },
-
-      importReadyText: {
-        flex: 1,
-        color: C.greenDark,
-        fontSize: 13,
-        fontWeight: "700",
-      },
-
-      importChoiceDisabled: {
-        opacity: 0.55,
-        backgroundColor: C.surface,
-        borderColor: C.border,
-      },
-
-      importChoiceIcon: {
-        width: 42,
-        height: 42,
-        borderRadius: 11,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      importChoiceIconDisabled: {
-        backgroundColor: C.surface,
-      },
-
-      importChoiceTitleDisabled: {
-        color: C.muted,
-      },
-
-      importChoiceSubtitleDisabled: {
-        color: C.muted2,
-      },
-
-      importChoiceLockedText: {
-        marginTop: 14,
-        color: C.muted,
-        fontSize: 14,
-        fontWeight: "700",
-      },
-
-      importChoiceRow: {
-        flexDirection: "row",
-        gap: 15,
-        marginBottom: 20,
-      },
-
-      importChoice: {
-        flex: 1,
-        minHeight: 190,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderStyle: "dashed",
-        borderColor: C.border,
-        borderRadius: 15,
-        padding: 22,
-        justifyContent: "center",
-      },
-
-      importChoiceTitle: {
-        color: C.text,
-        fontSize: 17,
-        fontWeight: "800",
-        marginTop: 17,
-      },
-
-      importChoiceSubtitle: {
-        color: C.text,
-        fontSize: 15,
-        marginTop: 8,
-      },
-
-      browseText: {
-        color: C.green,
-        fontSize: 15,
-        fontWeight: "800",
-        marginTop: 17,
-      },
-
-      loadingBanner: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 9,
-        backgroundColor: C.mint2,
-        borderRadius: 10,
-        padding: 12,
-        marginBottom: 14,
-      },
-
-      loadingText: {
-        color: C.text,
-        fontSize: 15,
-      },
-
-      datasetItem: {
-        minHeight: 62,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 10,
-        padding: 10,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-      },
-
-      datasetName: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      datasetMeta: {
-        color: C.muted,
-        fontSize: 12,
-        marginTop: 3,
-      },
-
-      datasetScore: {
-        alignItems: "center",
-        minWidth: 52,
-      },
-
-      datasetScoreValue: {
-        color: C.green,
-        fontSize: 17,
-        fontWeight: "800",
-      },
-
-      datasetScoreLabel: {
-        color: C.muted,
-        fontSize: 11,
-      },
-
-      bullet: {
-        color: C.text,
-        fontSize: 15,
-        lineHeight: 31,
-      },
-
-      empty: {
-        alignItems: "center",
-        paddingVertical: 30,
-      },
-
-      emptyTitle: {
-        color: C.text,
-        fontWeight: "800",
-        fontSize: 15,
-        marginTop: 9,
-      },
-
-      emptyText: {
-        color: C.muted,
-        fontSize: 14,
-        marginTop: 4,
-        textAlign: "center",
-      },
-
-      reportGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 10,
-      },
-
-      reportCell: {
-        flexGrow: 1,
-        flexBasis: "30%",
-        minHeight: 67,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 10,
-        padding: 12,
-        justifyContent: "center",
-      },
-
-      reportCellLabel: {
-        color: C.muted,
-        fontSize: 11.5,
-        letterSpacing: 1,
-        fontWeight: "800",
-        marginBottom: 5,
-      },
-
-      reportCellValue: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      reportDatasetList: {
-        marginTop: 4,
-      },
-
-      reportDatasetOption: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 8,
-        backgroundColor: C.surface,
-      },
-
-      reportDatasetOptionActive: {
-        borderColor: C.green,
-        backgroundColor: C.mint2,
-      },
-
-      reportDatasetIcon: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: C.mint2,
-      },
-
-      reportDatasetName: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      reportDatasetMeta: {
-        color: C.muted,
-        fontSize: 12,
-        marginTop: 3,
-      },
-
-      reportDatasetRadio: {
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        borderWidth: 2,
-        borderColor: C.border,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      reportDatasetRadioActive: {
-        borderColor: C.green,
-      },
-
-      reportDatasetRadioInner: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        backgroundColor: C.green,
-      },
-
-      reportHeadingRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 12,
-        marginBottom: 14,
-      },
-
-      reportStatusPill: {
-        paddingHorizontal: 10,
-        paddingVertical: 7,
-        borderRadius: 999,
-        backgroundColor: C.mint2,
-      },
-
-      reportStatusPillText: {
-        color: C.greenDark,
-        fontSize: 11,
-        fontWeight: "800",
-        letterSpacing: 0.8,
-      },
-
-      reportInsight: {
-        marginTop: 12,
-        borderRadius: 12,
-        padding: 14,
-        backgroundColor: C.mint2,
-        borderWidth: 1,
-        borderColor: C.border,
-      },
-
-      reportInsightLabel: {
-        color: C.teal,
-        fontSize: 11,
-        fontWeight: "800",
-        letterSpacing: 1.2,
-        marginBottom: 5,
-      },
-
-      reportInsightTitle: {
-        color: C.text,
-        fontSize: 16,
-        fontWeight: "800",
-      },
-
-      reportInsightText: {
-        color: C.muted,
-        fontSize: 14,
-        lineHeight: 19,
-        marginTop: 5,
-      },
-
-      dashboardTopRow: {
-        flexDirection: "row",
-        gap: 10,
-        marginBottom: 10,
-        alignItems: "stretch",
-      },
-
-      dashboardSidePanel: {
-        flex: 1,
-        minWidth: 0,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 13,
-        padding: 12,
-      },
-
-      dashboardChartPanel: {
-        flex: 1,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 13,
-        padding: 12,
-      },
-
-      dashboardKCard: {
-        flex: 1,
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 13,
-        padding: 14,
-      },
-
-      dashboardDonutGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        justifyContent: "space-between",
-        gap: 8,
-        marginTop: 10,
-      },
-
-      dashboardDonutItem: {
-        width: "48%",
-        minWidth: 0,
-        alignItems: "center",
-        paddingVertical: 5,
-      },
-
-      dashboardDonut: {
-        width: 112,
-        height: 112,
-        alignItems: "center",
-        justifyContent: "center",
-        position: "relative",
-      },
-
-      dashboardDonutCenter: {
-        position: "absolute",
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      dashboardDonutValue: {
-        color: C.text,
-        fontSize: 14,
-        fontWeight: "900",
-      },
-
-      dashboardDonutUnit: {
-        color: C.muted,
-        fontSize: 12,
-        fontWeight: "800",
-        marginTop: 1,
-      },
-
-      dashboardDonutLabel: {
-        color: C.text,
-        fontSize: 12,
-        fontWeight: "900",
-        marginTop: 4,
-      },
-
-      dashboardDonutMeta: {
-        color: C.muted,
-        fontSize: 12,
-        marginTop: 1,
-      },
-
-      dashboardDonutLegend: {
-        marginTop: 5,
-        alignItems: "flex-start",
-      },
-
-      dashboardDonutLegendItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginTop: 2,
-      },
-
-      dashboardDonutLegendDot: {
-        width: 7,
-        height: 7,
-        borderRadius: 999,
-        marginRight: 5,
-      },
-
-      dashboardDonutLegendText: {
-        color: C.muted,
-        fontSize: 10,
-        fontWeight: "700",
-      },
-
-      chartGrid: {
-        flex: 1,
-        flexDirection: "column",
-        justifyContent: "space-between",
-        gap: 6,
-        marginTop: 8,
-        minHeight: 0,
-        width: "100%",
-      },
-
-      chartRow: {
-        flex: 1,
-        minHeight: 0,
-        justifyContent: "center",
-        paddingVertical: 4,
-        paddingHorizontal: 2,
-      },
-
-      chartCardTop: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 7,
-        marginBottom: 5,
-      },
-
-      chartStatusDot: {
-        width: 9,
-        height: 9,
-        borderRadius: 999,
-      },
-
-      chartLabel: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "900",
-        flex: 1,
-      },
-
-      chartValue: {
-        color: C.text,
-        fontSize: 17,
-        fontWeight: "900",
-      },
-
-      chartTrack: {
-        width: "100%",
-        height: 22,
-        borderRadius: 999,
-        backgroundColor: C.mint2,
-        overflow: "hidden",
-      },
-
-      chartBar: {
-        height: "100%",
-        borderRadius: 999,
-      },
-
-      chartShare: {
-        color: C.muted,
-        fontSize: 14,
-        fontWeight: "700",
-        marginTop: 4,
-      },
-
-      dashboardIndexFooter: {
-        marginTop: 10,
-        paddingTop: 9,
-        borderTopWidth: 1,
-        borderTopColor: C.border,
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 22,
-      },
-
-      dashboardIndexLegendItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 5,
-      },
-
-      dashboardIndexLegendDot: {
-        width: 9,
-        height: 9,
-        borderRadius: 999,
-      },
-
-      dashboardIndexLegendText: {
-        color: C.text,
-        fontSize: 15,
-        fontWeight: "800",
-      },
-
-      barChart: {
-        alignItems: "flex-end",
-        gap: 14,
-        paddingTop: 20,
-        paddingBottom: 8,
-        paddingHorizontal: 8,
-      },
-
-      barColumn: {
-        width: 54,
-        alignItems: "center",
-      },
-
-      barValue: {
-        color: C.muted,
-        fontSize: 11,
-        fontWeight: "800",
-        marginBottom: 5,
-      },
-
-      barArea: {
-        height: 180,
-        width: 30,
-        justifyContent: "flex-end",
-        alignItems: "center",
-      },
-
-      verticalBar: {
-        width: 24,
-        borderTopLeftRadius: 6,
-        borderTopRightRadius: 6,
-      },
-
-      barLabel: {
-        color: C.text,
-        fontSize: 12,
-        fontWeight: "800",
-        marginTop: 7,
-      },
-
-      recommendation: {
-        color: C.text,
-        fontSize: 15,
-        lineHeight: 28,
-      },
-
-      exportRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 14,
-        marginTop: 3,
-      },
-
-      pdfButton: {
-        backgroundColor: C.teal,
-      },
-
-      exportHint: {
-        color: C.muted,
-        fontSize: 13,
-        flex: 1,
-      },
-
-      profilePanel: {
-        backgroundColor: C.surface,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 15,
-        padding: 20,
-      },
-
-      profileName: {
-        color: C.text,
-        fontSize: 18,
-        fontWeight: "800",
-      },
-
-      profileEmail: {
-        color: C.muted,
-        fontSize: 13,
-        marginTop: 3,
-      },
-
-      profileIdentity: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 15,
-        marginTop: 17,
-        marginBottom: 20,
-      },
-
-      profileAvatar: {
-        width: 65,
-        height: 65,
-        borderRadius: 17,
-        backgroundColor: C.mint,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-
-      profileAvatarText: {
-        color: C.green,
-        fontSize: 25,
-        fontWeight: "800",
-      },
-
-      profileRole: {
-        color: C.text,
-        fontSize: 19,
-        fontWeight: "800",
-      },
-
-      profileType: {
-        color: C.text,
-        fontSize: 15,
-        marginTop: 4,
-      },
-
-      profileGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 12,
-      },
-
-      signOutButton: {
-        alignSelf: "flex-start",
-        height: 43,
-        paddingHorizontal: 14,
-        borderWidth: 1,
-        borderColor: C.border,
-        borderRadius: 9,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        marginTop: 26,
-      },
-
-      signOutText: {
-        color: C.danger,
-        fontWeight: "800",
-        fontSize: 15,
-      },
-
-      authThemeToggle: {
-        flexDirection: "row",
-        alignItems: "center",
-        alignSelf: "center",
-        gap: 7,
-        paddingHorizontal: 13,
-        paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.surface,
-        marginBottom: 14,
-      },
-
-      authThemeToggleText: {
-        color: C.text,
-        fontSize: 14,
-        fontWeight: "700",
-      },
-
-      themeToggle: {
-        height: 38,
-        paddingHorizontal: 12,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: C.border,
-        backgroundColor: C.surface,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        marginLeft: "auto",
-        marginRight: 12,
-      },
-
-      themeToggleText: {
-        color: C.text,
-        fontSize: 14,
-        fontWeight: "800",
-      },
-    });
-  }
-
-  styles = createStyles();
-
-  export { API };
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 24,
+    },
+
+    brand: {
+      alignItems: "center",
+      marginBottom: 34,
+    },
+
+    logo: {
+      width: 52,
+      height: 52,
+      borderRadius: 14,
+      backgroundColor: C.teal,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+
+    brandName: {
+      fontSize: 27,
+      fontWeight: "800",
+      color: C.text,
+    },
+
+    tagline: {
+      marginTop: 4,
+      color: C.muted,
+      fontSize: 15,
+    },
+
+    authCard: {
+      width: "100%",
+      maxWidth: 440,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 18,
+      padding: 28,
+    },
+
+    eyebrow: {
+      color: C.teal,
+      fontSize: 13,
+      letterSpacing: 2,
+      fontWeight: "800",
+      marginBottom: 10,
+    },
+
+    h1: {
+      color: C.text,
+      fontSize: 30,
+      fontWeight: "800",
+      marginBottom: 10,
+    },
+
+    sub: {
+      color: C.muted,
+      fontSize: 15,
+      lineHeight: 23,
+      marginBottom: 25,
+    },
+
+    fieldWrap: {
+      marginBottom: 16,
+    },
+
+    fieldLabel: {
+      color: C.muted,
+      fontSize: 13,
+      letterSpacing: 1.4,
+      fontWeight: "800",
+      marginBottom: 8,
+    },
+
+    input: {
+      height: 48,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      color: C.text,
+      backgroundColor: C.surface,
+      fontSize: 15,
+    },
+
+    passwordBox: {
+      height: 48,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      paddingLeft: 14,
+      paddingRight: 13,
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 16,
+    },
+
+    passwordInput: {
+      flex: 1,
+      color: C.text,
+      fontSize: 15,
+    },
+
+    authError: {
+      color: C.danger,
+      fontSize: 15,
+      marginBottom: 14,
+    },
+
+    primaryButton: {
+      height: 48,
+      borderRadius: 10,
+      backgroundColor: C.green,
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 2,
+    },
+
+    primaryButtonText: {
+      color: C.white,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    authSwitch: {
+      color: C.teal,
+      textAlign: "center",
+      fontWeight: "800",
+      fontSize: 15,
+      marginTop: 19,
+    },
+
+    shell: {
+      flex: 1,
+      flexDirection: "row",
+      backgroundColor: C.bg,
+    },
+
+    sidebar: {
+      width: 375,
+      backgroundColor: C.sidebar,
+      borderRightWidth: 1,
+      borderRightColor: C.border,
+      paddingHorizontal: 17,
+      paddingTop: 22,
+      paddingBottom: 17,
+    },
+
+    sidebarMobile: {
+      position: "absolute",
+      zIndex: 100,
+      left: 0,
+      top: 0,
+      bottom: 0,
+      elevation: 20,
+    },
+
+    sidebarBrand: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 5,
+      marginBottom: 43,
+    },
+
+    sidebarLogo: {
+      width: 51,
+      height: 51,
+      marginRight: 14,
+      resizeMode: "contain",
+    },
+    sidebarBrandText: {
+      color: C.text,
+      fontSize: 20,
+      fontWeight: "800",
+    },
+
+    workspaceLabel: {
+      color: C.muted,
+      fontSize: 12,
+      fontWeight: "800",
+      letterSpacing: 1.5,
+      marginHorizontal: 5,
+      marginBottom: 14,
+    },
+
+    navList: {
+      gap: 5,
+    },
+
+    navItem: {
+      minHeight: 68,
+      borderRadius: 15,
+      paddingHorizontal: 15,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 20,
+    },
+
+    navItemActive: {
+      backgroundColor: C.mint,
+      borderWidth: 2,
+      borderColor: C.border,
+    },
+
+    navText: {
+      color: C.muted,
+      fontSize: 20,
+      fontWeight: "500",
+    },
+
+    navTextActive: {
+      color: C.greenDark,
+      fontWeight: "800",
+    },
+
+    sidebarBottom: {
+      marginTop: "auto",
+    },
+
+    sidebarDivider: {
+      height: 1,
+      backgroundColor: C.border,
+      marginBottom: 15,
+    },
+
+    userMini: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+    },
+
+    avatarSmall: {
+      width: 36,
+      height: 36,
+      borderRadius: 11,
+      backgroundColor: C.mint,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    avatarLetter: {
+      color: C.green,
+      fontWeight: "800",
+      fontSize: 16,
+    },
+
+    userMiniName: {
+      color: C.text,
+      fontWeight: "800",
+      fontSize: 14.5,
+    },
+
+    userMiniRole: {
+      color: C.muted,
+      fontSize: 13,
+      marginTop: 2,
+    },
+
+    main: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    topbar: {
+      height: 74,
+      backgroundColor: C.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 38,
+    },
+
+    mobileMenu: {
+      display: "none",
+      marginRight: 14,
+    },
+
+    topbarTitle: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 18,
+    },
+
+    topTitle: {
+      color: C.text,
+      fontSize: 19,
+      fontWeight: "800",
+    },
+
+    topSubtitle: {
+      color: C.muted,
+      fontSize: 14,
+      marginTop: 2,
+    },
+
+    topAvatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: C.mint,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    topAvatarText: {
+      color: C.green,
+      fontWeight: "800",
+    },
+
+    content: {
+      flex: 1,
+      backgroundColor: C.bg,
+    },
+
+    contentInner: {
+      paddingHorizontal: 30,
+      paddingVertical: 29,
+      maxWidth: 1350,
+      width: "100%",
+      alignSelf: "center",
+    },
+
+    pageIntro: {
+      marginBottom: 28,
+    },
+
+    pageEyebrow: {
+      color: C.teal,
+      fontSize: 13,
+      letterSpacing: 2,
+      fontWeight: "800",
+      marginBottom: 7,
+    },
+
+    pageTitle: {
+      color: C.text,
+      fontSize: 31,
+      lineHeight: 38,
+      fontWeight: "800",
+      marginBottom: 9,
+    },
+
+    pageDescription: {
+      color: C.muted,
+      fontSize: 15,
+      lineHeight: 23,
+      maxWidth: 820,
+    },
+
+    heroCard: {
+      minHeight: 150,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 16,
+      padding: 18,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 20,
+      marginBottom: 10,
+    },
+
+    heroEyebrow: {
+      color: C.teal,
+      fontSize: 15,
+      letterSpacing: 2,
+      fontWeight: "800",
+      marginBottom: 6,
+    },
+
+    heroTitle: {
+      color: C.text,
+      fontSize: 27,
+      lineHeight: 32,
+      fontWeight: "800",
+      maxWidth: 650,
+    },
+
+    heroText: {
+      color: C.muted,
+      fontSize: 15,
+      lineHeight: 17,
+      marginTop: 6,
+      maxWidth: 540,
+    },
+
+    importButton: {
+      backgroundColor: C.green,
+      borderRadius: 9,
+      height: 39,
+      paddingHorizontal: 18,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+
+    importButtonText: {
+      color: C.white,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    analysisHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 24,
+      marginBottom: 28,
+      position: "relative",
+      zIndex: 100,
+    },
+
+    analysisHeaderText: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    statRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 10,
+    },
+
+    sampleSelectorPanel: {
+      width: 360,
+      maxWidth: "42%",
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 0,
+      position: "relative",
+      zIndex: 200,
+    },
+
+    sampleSelectorHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 7,
+    },
+
+    sampleSelectorTitle: {
+      color: C.teal,
+      fontSize: 15,
+      fontWeight: "800",
+      letterSpacing: 0.7,
+      textTransform: "uppercase",
+    },
+
+    sampleSelectorSubtitle: {
+      color: C.muted,
+      fontSize: 15,
+      marginTop: 3,
+    },
+
+    sampleSelectorButton: {
+      minHeight: 48,
+      borderWidth: 1,
+      borderColor: C.teal,
+      borderRadius: 8,
+      paddingHorizontal: 13,
+      paddingVertical: 7,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: C.bg,
+    },
+
+    sampleSelectorValue: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    sampleSelectorMeta: {
+      color: C.muted,
+      fontSize: 14,
+      marginTop: 2,
+    },
+
+    sampleDropdown: {
+      position: "absolute",
+      left: 12,
+      right: 12,
+      top: 78,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.teal,
+      borderRadius: 8,
+      zIndex: 100,
+      elevation: 12,
+      shadowColor: "#000000",
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+    },
+
+    sampleDropdownScroll: {
+      maxHeight: 320,
+    },
+
+    sampleDropdownOption: {
+      minHeight: 54,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+    },
+
+    sampleDropdownOptionActive: {
+      backgroundColor: C.mint2,
+    },
+
+    sampleDropdownName: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    sampleDropdownMeta: {
+      color: C.muted,
+      fontSize: 14,
+      marginTop: 2,
+    },
+
+    sampleDropdownMetrics: {
+      alignItems: "flex-end",
+      marginRight: 6,
+    },
+
+    sampleDropdownMetric: {
+      color: C.muted,
+      fontSize: 13,
+      lineHeight: 13,
+    },
+
+    gaugeRow: {
+      flexDirection: "row",
+      gap: 15,
+      marginBottom: 15,
+    },
+
+    gaugeCard: {
+      flex: 1,
+      height: 177,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 9,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+      position: "relative",
+    },
+
+    gaugeValueContainer: {
+      position: "absolute",
+      top: 88,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+    },
+
+    gaugeValue: {
+      color: C.text,
+      fontSize: 20,
+      lineHeight: 24,
+      fontWeight: "900",
+    },
+
+    gaugeStatus: {
+      fontSize: 13,
+      lineHeight: 13,
+      fontWeight: "800",
+      marginTop: 2,
+    },
+
+    gaugeLabel: {
+      color: C.muted,
+      fontSize: 14,
+      lineHeight: 14,
+      marginTop: 1,
+    },
+
+    statCard: {
+      flex: 1,
+      minHeight: 150,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 24,
+    },
+
+    statValue: {
+      color: C.text,
+      fontSize: 32,
+      fontWeight: "800",
+      marginTop: 12,
+    },
+
+    metricValue: {
+      color: C.text,
+      fontSize: 27,
+      fontWeight: "800",
+      marginTop: 9,
+    },
+
+    statLabel: {
+      color: C.muted,
+      fontSize: 15,
+      marginTop: 2,
+    },
+
+    singleStat: {
+      minHeight: 135,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 24,
+      marginBottom: 15,
+    },
+
+    bigStat: {
+      color: C.text,
+      fontSize: 32,
+      fontWeight: "800",
+      marginTop: 12,
+    },
+
+    temporalPanel: {
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 18,
+      padding: 24,
+      marginBottom: 15,
+      shadowColor: "#000000",
+      shadowOpacity: 0.06,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
+
+    temporalHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 14,
+      marginBottom: 16,
+    },
+
+    temporalHeaderText: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    temporalHeaderBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.mint2,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+
+    temporalHeaderBadgeText: {
+      color: C.text,
+      fontSize: 13,
+      fontWeight: "800",
+    },
+
+    temporalControls: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 12,
+      marginBottom: 13,
+    },
+
+    temporalControlGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 7,
+    },
+
+    temporalControlLabel: {
+      color: C.muted,
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 1,
+      marginRight: 2,
+    },
+
+    temporalFilter: {
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      backgroundColor: C.surface,
+    },
+
+    temporalFilterActive: {
+      backgroundColor: C.mint,
+      borderColor: C.teal,
+    },
+
+    temporalFilterText: {
+      color: C.muted,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+
+    temporalFilterTextActive: {
+      color: C.teal,
+    },
+
+    temporalAction: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      backgroundColor: C.surface,
+    },
+
+    temporalActionActive: {
+      backgroundColor: C.teal,
+      borderColor: C.teal,
+    },
+
+    temporalActionText: {
+      color: C.teal,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    temporalActionTextActive: {
+      color: C.white,
+    },
+
+    temporalIconButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    temporalLegendWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 16,
+    },
+
+    temporalLegendItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      backgroundColor: C.surface,
+    },
+
+    temporalLegendItemMuted: {
+      opacity: 0.35,
+    },
+
+    temporalLegendDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+
+    temporalLegendText: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    temporalBody: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: 18,
+    },
+
+    temporalBodyCompact: {
+      flexDirection: "column",
+    },
+
+    temporalMetrics: {
+      width: 245,
+      minWidth: 210,
+      gap: 10,
+    },
+
+    temporalMetricsCompact: {
+      width: "100%",
+      minWidth: 0,
+    },
+
+    temporalMetricCard: {
+      backgroundColor: C.mint2,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 11,
+      padding: 13,
+      minHeight: 78,
+    },
+
+    temporalMetricLabel: {
+      color: C.muted,
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 1,
+    },
+
+    temporalMetricValue: {
+      color: C.text,
+      fontSize: 22,
+      fontWeight: "900",
+      marginTop: 5,
+    },
+
+    temporalMetricValueSmall: {
+      color: C.text,
+      fontSize: 16,
+      fontWeight: "900",
+      marginLeft: 6,
+    },
+
+    temporalMetricHint: {
+      color: C.muted,
+      fontSize: 11,
+      marginTop: 2,
+    },
+
+    temporalTrendValueRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 5,
+    },
+
+    temporalComparisonCard: {
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 11,
+      padding: 12,
+      backgroundColor: C.surface,
+    },
+
+    temporalComparisonTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+
+    temporalComparisonTitle: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    temporalComparisonText: {
+      color: C.muted,
+      fontSize: 11,
+      lineHeight: 14,
+      marginTop: 5,
+    },
+
+    temporalAlertCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      borderWidth: 1,
+      borderColor: C.danger,
+      borderRadius: 11,
+      padding: 11,
+      backgroundColor: C.surface,
+    },
+
+    temporalAlertIcon: {
+      width: 31,
+      height: 31,
+      borderRadius: 10,
+      backgroundColor: C.mint2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    temporalAlertTitle: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    temporalAlertText: {
+      color: C.muted,
+      fontSize: 11,
+      lineHeight: 13,
+      marginTop: 2,
+    },
+
+    temporalChartArea: {
+      flex: 1,
+      minWidth: 0,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 13,
+      padding: 14,
+      backgroundColor: C.surface,
+      overflow: "hidden",
+    },
+
+    temporalChartTopRow: {
+      minHeight: 52,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 10,
+    },
+
+    temporalChartTitle: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    temporalChartSubtitle: {
+      color: C.muted,
+      fontSize: 11,
+      marginTop: 3,
+    },
+
+    temporalTooltip: {
+      minWidth: 115,
+      borderWidth: 1,
+      borderColor: C.teal,
+      borderRadius: 9,
+      paddingHorizontal: 9,
+      paddingVertical: 7,
+      backgroundColor: C.mint2,
+    },
+
+    temporalTooltipTitle: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    temporalTooltipValue: {
+      color: C.teal,
+      fontSize: 15,
+      fontWeight: "900",
+      marginTop: 2,
+    },
+
+    temporalTooltipDate: {
+      color: C.muted,
+      fontSize: 10,
+      marginTop: 1,
+    },
+
+    temporalChartScroll: {
+      width: "100%",
+    },
+
+    temporalAxisNote: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 10,
+      marginTop: 2,
+    },
+
+    temporalAxisRight: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+
+    temporalAxisText: {
+      color: C.muted,
+      fontSize: 10,
+    },
+
+    temporalEmpty: {
+      minHeight: 250,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 13,
+      backgroundColor: C.mint2,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 28,
+    },
+
+    temporalEmptyTitle: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+      marginTop: 10,
+    },
+
+    temporalEmptyText: {
+      color: C.muted,
+      fontSize: 13,
+      lineHeight: 18,
+      textAlign: "center",
+      maxWidth: 500,
+      marginTop: 5,
+    },
+
+    panel: {
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 24,
+      marginBottom: 15,
+    },
+
+    panelTitle: {
+      color: C.text,
+      fontSize: 17,
+      fontWeight: "800",
+    },
+
+    panelSubtitle: {
+      color: C.muted2,
+      fontSize: 15,
+      marginTop: 3,
+      marginBottom: 13,
+    },
+
+    sampleRow: {
+      minHeight: 58,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 10,
+      gap: 10,
+    },
+
+    statusDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+
+    sampleTitle: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    sampleMeta: {
+      color: C.muted,
+      fontSize: 13,
+      marginTop: 2,
+    },
+
+    sampleRight: {
+      alignItems: "flex-end",
+      minWidth: 115,
+    },
+
+    sampleHpi: {
+      color: C.text,
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    sampleHei: {
+      color: C.muted,
+      fontSize: 12,
+      marginTop: 3,
+    },
+
+    templatePanel: {
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 24,
+      marginBottom: 15,
+      shadowColor: "#000000",
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+
+    templateHeaderRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 16,
+    },
+
+    templateFieldCount: {
+      minWidth: 86,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 11,
+      backgroundColor: C.mint2,
+      alignItems: "center",
+    },
+
+    templateFieldCountValue: {
+      color: C.teal,
+      fontSize: 20,
+      fontWeight: "900",
+    },
+
+    templateFieldCountLabel: {
+      color: C.muted,
+      fontSize: 10,
+      fontWeight: "900",
+      letterSpacing: 0.8,
+      marginTop: 2,
+    },
+
+    templateContent: {
+      flexDirection: "row",
+      gap: 22,
+      marginTop: 8,
+    },
+
+    templateInfoSection: {
+      flex: 1.65,
+      minWidth: 0,
+    },
+
+    templateContentNarrow: {
+      flexDirection: "column",
+    },
+
+    templateDownloadSection: {
+      flex: 0.9,
+      minWidth: 270,
+      padding: 12,
+      borderRadius: 13,
+      backgroundColor: C.mint2,
+      borderWidth: 1,
+      borderColor: C.border,
+    },
+
+    templateDownloadRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+
+    templateDownloadSectionNarrow: {
+      minWidth: 0,
+      width: "100%",
+    },
+
+    templateInfoRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      paddingVertical: 8,
+    },
+
+    templateInfoTitle: {
+      color: C.text,
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    templateInfoText: {
+      color: C.muted,
+      fontSize: 12.5,
+      lineHeight: 16,
+      marginTop: 2,
+    },
+
+    templateValidationBox: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      padding: 11,
+      marginTop: 7,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+    },
+
+    templateGuideHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 13,
+      marginBottom: 8,
+    },
+
+    templateGuideTitle: {
+      color: C.text,
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    templateCopyButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+    },
+
+    templateCopyText: {
+      color: C.teal,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    templateFieldGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 7,
+    },
+
+    templateFieldItem: {
+      flexBasis: "48%",
+      minWidth: 210,
+      minHeight: 34,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+    },
+
+    templateFieldName: {
+      color: C.text,
+      fontSize: 11.5,
+      fontWeight: "700",
+    },
+
+    templateTooltipText: {
+      color: C.muted,
+      fontSize: 11,
+      lineHeight: 13,
+      marginTop: 3,
+    },
+
+    templateDownloadTitle: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    templateDownloadText: {
+      color: C.muted,
+      fontSize: 12.5,
+      lineHeight: 15,
+      marginTop: 4,
+      marginBottom: 12,
+    },
+
+    templateDownloadButton: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 60,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      padding: 9,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+      marginBottom: 0,
+    },
+
+    templateDownloadIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 10,
+      backgroundColor: C.mint2,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    templateDownloadButtonTitle: {
+      color: C.text,
+      fontSize: 13.5,
+      fontWeight: "800",
+    },
+
+    templateDownloadButtonText: {
+      color: C.muted,
+      fontSize: 11.5,
+      marginTop: 3,
+    },
+
+    templatePreviewButton: {
+      minHeight: 43,
+      borderRadius: 9,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+      marginTop: 3,
+    },
+
+    templatePreviewText: {
+      color: C.text,
+      fontSize: 13,
+      fontWeight: "800",
+    },
+
+    templateStatus: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 10,
+    },
+
+    templateStatusText: {
+      flex: 1,
+      color: C.greenDark,
+      fontSize: 11.5,
+      fontWeight: "700",
+    },
+
+    templateModalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 20,
+    },
+
+    templateModal: {
+      width: "100%",
+      maxWidth: 1180,
+      maxHeight: "85%",
+      backgroundColor: C.surface,
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: C.border,
+    },
+
+    templateModalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+
+    templateModalTitle: {
+      color: C.text,
+      fontSize: 18,
+      fontWeight: "800",
+    },
+
+    templateModalSubtitle: {
+      color: C.muted,
+      fontSize: 12.5,
+      marginTop: 3,
+    },
+
+    templatePreviewRow: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+    },
+
+    templatePreviewHeader: {
+      backgroundColor: C.mint2,
+      borderTopLeftRadius: 8,
+      borderTopRightRadius: 8,
+    },
+
+    templatePreviewCell: {
+      width: 150,
+      color: C.text,
+      fontSize: 11,
+      paddingHorizontal: 8,
+      paddingVertical: 9,
+      borderRightWidth: 1,
+      borderRightColor: C.border,
+    },
+
+    templatePreviewHeaderText: {
+      color: C.muted,
+      fontWeight: "900",
+      fontSize: 10.5,
+    },
+
+    metadataGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
+
+    metadataGridField: {
+      flexBasis: "48%",
+      minWidth: 260,
+    },
+
+    checkRow: {
+      minHeight: 70,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 10,
+    },
+
+    checkIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    checkTitle: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    checkMeta: {
+      color: C.muted,
+      fontSize: 12.5,
+      marginTop: 3,
+    },
+
+    checkBadge: {
+      minWidth: 68,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 999,
+      alignItems: "center",
+    },
+
+    checkBadgeText: {
+      fontSize: 11,
+      fontWeight: "900",
+      letterSpacing: 0.8,
+    },
+
+    sectionHeadingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 10,
+      marginTop: 4,
+    },
+
+    sectionHeading: {
+      color: C.muted,
+      fontSize: 13,
+      letterSpacing: 1.7,
+      fontWeight: "800",
+    },
+
+    decisionCard: {
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 17,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 14,
+      marginBottom: 10,
+    },
+
+    decisionIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 11,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    decisionTitle: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    decisionText: {
+      color: C.muted,
+      fontSize: 15,
+      lineHeight: 20,
+      marginTop: 5,
+    },
+
+    resultsTable: {
+      minWidth: 1100,
+    },
+
+    resultTableRow: {
+      minHeight: 56,
+      flexDirection: "row",
+      alignItems: "center",
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+      paddingVertical: 8,
+    },
+
+    resultTableHeader: {
+      backgroundColor: C.mint2,
+      borderRadius: 8,
+    },
+
+    resultTableCell: {
+      width: 145,
+      color: C.text,
+      fontSize: 12.5,
+      paddingHorizontal: 9,
+    },
+
+    resultTableId: {
+      width: 85,
+      fontWeight: "800",
+    },
+
+    resultTableHeaderText: {
+      color: C.muted,
+      fontSize: 11,
+      fontWeight: "900",
+      letterSpacing: 0.7,
+      textTransform: "uppercase",
+    },
+
+    resultStatus: {
+      width: 105,
+      marginHorizontal: 5,
+      paddingVertical: 6,
+      borderRadius: 999,
+      alignItems: "center",
+    },
+
+    resultStatusText: {
+      fontSize: 11,
+      fontWeight: "900",
+    },
+
+    qualityHero: {
+      backgroundColor: C.mint,
+      borderRadius: 15,
+      padding: 25,
+      marginBottom: 20,
+    },
+
+    qualityEyebrow: {
+      color: C.teal,
+      fontSize: 13,
+      fontWeight: "800",
+      letterSpacing: 1.6,
+    },
+
+    qualityScoreLine: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      marginTop: 8,
+    },
+
+    qualityScore: {
+      color: C.green,
+      fontSize: 48,
+      lineHeight: 55,
+      fontWeight: "800",
+    },
+
+    qualityOutOf: {
+      color: C.muted,
+      fontSize: 18,
+      fontWeight: "700",
+      marginLeft: 8,
+    },
+
+    qualityGrade: {
+      color: C.text,
+      fontSize: 15,
+      marginTop: 2,
+    },
+
+    importLockedBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      marginTop: 14,
+      padding: 13,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: C.warning,
+      backgroundColor: C.mint2,
+    },
+
+    importLockedIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: C.mint,
+    },
+
+    importLockedTitle: {
+      color: C.text,
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    importLockedText: {
+      color: C.muted,
+      fontSize: 13,
+      lineHeight: 16,
+      marginTop: 2,
+    },
+
+    importReadyBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginTop: 14,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.mint2,
+    },
+
+    importReadyIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: C.mint2,
+    },
+
+    importReadyText: {
+      flex: 1,
+      color: C.greenDark,
+      fontSize: 13,
+      fontWeight: "700",
+    },
+
+    importChoiceDisabled: {
+      opacity: 0.55,
+      backgroundColor: C.surface,
+      borderColor: C.border,
+    },
+
+    importChoiceIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 11,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    importChoiceIconDisabled: {
+      backgroundColor: C.surface,
+    },
+
+    importChoiceTitleDisabled: {
+      color: C.muted,
+    },
+
+    importChoiceSubtitleDisabled: {
+      color: C.muted2,
+    },
+
+    importChoiceLockedText: {
+      marginTop: 14,
+      color: C.muted,
+      fontSize: 14,
+      fontWeight: "700",
+    },
+
+    importChoiceRow: {
+      flexDirection: "row",
+      gap: 15,
+      marginBottom: 20,
+    },
+
+    importChoice: {
+      flex: 1,
+      minHeight: 190,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 22,
+      justifyContent: "center",
+    },
+
+    importChoiceTitle: {
+      color: C.text,
+      fontSize: 17,
+      fontWeight: "800",
+      marginTop: 17,
+    },
+
+    importChoiceSubtitle: {
+      color: C.text,
+      fontSize: 15,
+      marginTop: 8,
+    },
+
+    browseText: {
+      color: C.green,
+      fontSize: 15,
+      fontWeight: "800",
+      marginTop: 17,
+    },
+
+    loadingBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+      backgroundColor: C.mint2,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 14,
+    },
+
+    loadingText: {
+      color: C.text,
+      fontSize: 15,
+    },
+
+    datasetItem: {
+      minHeight: 62,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      padding: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+
+    datasetName: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    datasetMeta: {
+      color: C.muted,
+      fontSize: 12,
+      marginTop: 3,
+    },
+
+    datasetScore: {
+      alignItems: "center",
+      minWidth: 52,
+    },
+
+    datasetScoreValue: {
+      color: C.green,
+      fontSize: 17,
+      fontWeight: "800",
+    },
+
+    datasetScoreLabel: {
+      color: C.muted,
+      fontSize: 11,
+    },
+
+    bullet: {
+      color: C.text,
+      fontSize: 15,
+      lineHeight: 31,
+    },
+
+    empty: {
+      alignItems: "center",
+      paddingVertical: 30,
+    },
+
+    emptyTitle: {
+      color: C.text,
+      fontWeight: "800",
+      fontSize: 15,
+      marginTop: 9,
+    },
+
+    emptyText: {
+      color: C.muted,
+      fontSize: 14,
+      marginTop: 4,
+      textAlign: "center",
+    },
+
+    reportGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+
+    reportCell: {
+      flexGrow: 1,
+      flexBasis: "30%",
+      minHeight: 67,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 10,
+      padding: 12,
+      justifyContent: "center",
+    },
+
+    reportCellLabel: {
+      color: C.muted,
+      fontSize: 11.5,
+      letterSpacing: 1,
+      fontWeight: "800",
+      marginBottom: 5,
+    },
+
+    reportCellValue: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    reportDatasetList: {
+      marginTop: 4,
+    },
+
+    reportDatasetOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 8,
+      backgroundColor: C.surface,
+    },
+
+    reportDatasetOptionActive: {
+      borderColor: C.green,
+      backgroundColor: C.mint2,
+    },
+
+    reportDatasetIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: C.mint2,
+    },
+
+    reportDatasetName: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    reportDatasetMeta: {
+      color: C.muted,
+      fontSize: 12,
+      marginTop: 3,
+    },
+
+    reportDatasetRadio: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: C.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    reportDatasetRadioActive: {
+      borderColor: C.green,
+    },
+
+    reportDatasetRadioInner: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: C.green,
+    },
+
+    reportHeadingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      marginBottom: 14,
+    },
+
+    reportStatusPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: 999,
+      backgroundColor: C.mint2,
+    },
+
+    reportStatusPillText: {
+      color: C.greenDark,
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 0.8,
+    },
+
+    reportInsight: {
+      marginTop: 12,
+      borderRadius: 12,
+      padding: 14,
+      backgroundColor: C.mint2,
+      borderWidth: 1,
+      borderColor: C.border,
+    },
+
+    reportInsightLabel: {
+      color: C.teal,
+      fontSize: 11,
+      fontWeight: "800",
+      letterSpacing: 1.2,
+      marginBottom: 5,
+    },
+
+    reportInsightTitle: {
+      color: C.text,
+      fontSize: 16,
+      fontWeight: "800",
+    },
+
+    reportInsightText: {
+      color: C.muted,
+      fontSize: 14,
+      lineHeight: 19,
+      marginTop: 5,
+    },
+
+    dashboardTopRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 10,
+      alignItems: "stretch",
+    },
+
+    dashboardSidePanel: {
+      flex: 1,
+      minWidth: 0,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 13,
+      padding: 12,
+    },
+
+    dashboardChartPanel: {
+      flex: 1,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 13,
+      padding: 12,
+    },
+
+    dashboardKCard: {
+      flex: 1,
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 13,
+      padding: 14,
+    },
+
+    dashboardDonutGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      gap: 8,
+      marginTop: 10,
+    },
+
+    dashboardDonutItem: {
+      width: "48%",
+      minWidth: 0,
+      alignItems: "center",
+      paddingVertical: 5,
+    },
+
+    dashboardDonut: {
+      width: 112,
+      height: 112,
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+    },
+
+    dashboardDonutCenter: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    dashboardDonutValue: {
+      color: C.text,
+      fontSize: 14,
+      fontWeight: "900",
+    },
+
+    dashboardDonutUnit: {
+      color: C.muted,
+      fontSize: 12,
+      fontWeight: "800",
+      marginTop: 1,
+    },
+
+    dashboardDonutLabel: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "900",
+      marginTop: 4,
+    },
+
+    dashboardDonutMeta: {
+      color: C.muted,
+      fontSize: 12,
+      marginTop: 1,
+    },
+
+    dashboardDonutLegend: {
+      marginTop: 5,
+      alignItems: "flex-start",
+    },
+
+    dashboardDonutLegendItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 2,
+    },
+
+    dashboardDonutLegendDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999,
+      marginRight: 5,
+    },
+
+    dashboardDonutLegendText: {
+      color: C.muted,
+      fontSize: 10,
+      fontWeight: "700",
+    },
+
+    chartGrid: {
+      flex: 1,
+      flexDirection: "column",
+      justifyContent: "space-between",
+      gap: 6,
+      marginTop: 8,
+      minHeight: 0,
+      width: "100%",
+    },
+
+    chartRow: {
+      flex: 1,
+      minHeight: 0,
+      justifyContent: "center",
+      paddingVertical: 4,
+      paddingHorizontal: 2,
+    },
+
+    chartCardTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+      marginBottom: 5,
+    },
+
+    chartStatusDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 999,
+    },
+
+    chartLabel: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "900",
+      flex: 1,
+    },
+
+    chartValue: {
+      color: C.text,
+      fontSize: 17,
+      fontWeight: "900",
+    },
+
+    chartTrack: {
+      width: "100%",
+      height: 22,
+      borderRadius: 999,
+      backgroundColor: C.mint2,
+      overflow: "hidden",
+    },
+
+    chartBar: {
+      height: "100%",
+      borderRadius: 999,
+    },
+
+    chartShare: {
+      color: C.muted,
+      fontSize: 14,
+      fontWeight: "700",
+      marginTop: 4,
+    },
+
+    dashboardIndexFooter: {
+      marginTop: 10,
+      paddingTop: 9,
+      borderTopWidth: 1,
+      borderTopColor: C.border,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 22,
+    },
+
+    dashboardIndexLegendItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+
+    dashboardIndexLegendDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 999,
+    },
+
+    dashboardIndexLegendText: {
+      color: C.text,
+      fontSize: 15,
+      fontWeight: "800",
+    },
+
+    barChart: {
+      alignItems: "flex-end",
+      gap: 14,
+      paddingTop: 20,
+      paddingBottom: 8,
+      paddingHorizontal: 8,
+    },
+
+    barColumn: {
+      width: 54,
+      alignItems: "center",
+    },
+
+    barValue: {
+      color: C.muted,
+      fontSize: 11,
+      fontWeight: "800",
+      marginBottom: 5,
+    },
+
+    barArea: {
+      height: 180,
+      width: 30,
+      justifyContent: "flex-end",
+      alignItems: "center",
+    },
+
+    verticalBar: {
+      width: 24,
+      borderTopLeftRadius: 6,
+      borderTopRightRadius: 6,
+    },
+
+    barLabel: {
+      color: C.text,
+      fontSize: 12,
+      fontWeight: "800",
+      marginTop: 7,
+    },
+
+    recommendation: {
+      color: C.text,
+      fontSize: 15,
+      lineHeight: 28,
+    },
+
+    exportRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      marginTop: 3,
+    },
+
+    pdfButton: {
+      backgroundColor: C.teal,
+    },
+
+    exportHint: {
+      color: C.muted,
+      fontSize: 13,
+      flex: 1,
+    },
+
+    profilePanel: {
+      backgroundColor: C.surface,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 15,
+      padding: 20,
+    },
+
+    profileName: {
+      color: C.text,
+      fontSize: 18,
+      fontWeight: "800",
+    },
+
+    profileEmail: {
+      color: C.muted,
+      fontSize: 13,
+      marginTop: 3,
+    },
+
+    profileIdentity: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 15,
+      marginTop: 17,
+      marginBottom: 20,
+    },
+
+    profileAvatar: {
+      width: 65,
+      height: 65,
+      borderRadius: 17,
+      backgroundColor: C.mint,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    profileAvatarText: {
+      color: C.green,
+      fontSize: 25,
+      fontWeight: "800",
+    },
+
+    profileRole: {
+      color: C.text,
+      fontSize: 19,
+      fontWeight: "800",
+    },
+
+    profileType: {
+      color: C.text,
+      fontSize: 15,
+      marginTop: 4,
+    },
+
+    profileGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
+
+    signOutButton: {
+      alignSelf: "flex-start",
+      height: 43,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: C.border,
+      borderRadius: 9,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 26,
+    },
+
+    signOutText: {
+      color: C.danger,
+      fontWeight: "800",
+      fontSize: 15,
+    },
+
+    authThemeToggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "center",
+      gap: 7,
+      paddingHorizontal: 13,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+      marginBottom: 14,
+    },
+
+    authThemeToggleText: {
+      color: C.text,
+      fontSize: 14,
+      fontWeight: "700",
+    },
+
+    themeToggle: {
+      height: 38,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.surface,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      marginLeft: "auto",
+      marginRight: 12,
+    },
+
+    themeToggleText: {
+      color: C.text,
+      fontSize: 14,
+      fontWeight: "800",
+    },
+  });
+}
+
+styles = createStyles();
+
+export { API };
 
 
